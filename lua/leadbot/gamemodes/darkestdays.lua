@@ -36,7 +36,7 @@ function LeadBot.AddBotOverride(bot)
     bot:KillSilent()
     bot:SetDeaths(0)
     bot:SetTeamColor()
-    bot.NextSpawnTime = CurTime() + math.random(4, 8)
+    bot.NextSpawnTime = CurTime() + GetConVar("dd_options_spawn_time"):GetInt()
 end
 
 local function botTalk(bot, cmd)
@@ -198,15 +198,15 @@ function LeadBot.FindClosest(controller)
 end
 
 function LeadBot.StartCommand(bot, cmd)
-    local buttons = IN_SPEED
+    local buttons = 0
     local botWeapon = bot:GetActiveWeapon()
     local controller = bot.ControllerBot
     local target = controller.Target
 
     if !IsValid(controller) then return end
 
-    if LeadBot.NoSprint then
-        buttons = 0
+    if not IsValid(target) then
+        buttons = buttons + IN_SPEED
     end
 
     if IsValid(botWeapon) then
