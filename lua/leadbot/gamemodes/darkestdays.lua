@@ -102,6 +102,7 @@ function LeadBot.PlayerSpawn(bot)
     build.OnSet(bot)
 
     -- hats
+    --[[
     if !bot.Suit or #bot.Suit < 1 then
         local hats = {}
         local miscs = {}
@@ -127,6 +128,7 @@ function LeadBot.PlayerSpawn(bot)
     end
 
     ApplyEquipment(bot, _, bot.Suit)
+    ]]
 
     timer.Simple(0, function()
         if IsValid(bot) then
