@@ -59,12 +59,6 @@ function LeadBot.AddBot()
 end
 
 function LeadBot.AddBotOverride(bot)
-    if math.random(2) == 1 then
-        timer.Simple(math.random(1, 4), function()
-            LeadBot.TalkToMe(bot, "join")
-        end)
-    end
-
     if GAMEMODE:GetGametype() == "ffa" then
         bot:SetTeam(TEAM_FFA)
     elseif GAMEMODE:GetGametype() == "ts" then
@@ -181,24 +175,7 @@ end
 function LeadBot.PostPlayerDeath(bot)
 end
 
-local function botTalk(bot, cmd)
-    if !bot:Alive() then return end
-    if !VoiceAdvanced[bot:GetVoiceSet()].Commands[cmd] then return end
-
-    bot.NextCommand = bot.NextCommand or 0
-
-    if bot.NextCommand >= CurTime() then return end
-
-    bot.NextCommand = CurTime() + 7
-    bot:PlaySpeech(VoiceAdvanced[bot:GetVoiceSet()].Commands[cmd])
-end
-
 function LeadBot.PlayerHurt(ply, bot, hp, dmg)
-    if hp <= dmg and math.random(4) == 1 and IsValid(bot) and bot:IsPlayer() and bot:IsLBot() then
-        -- LeadBot.TalkToMe(bot, "taunt")
-        botTalk(bot, "taunt")
-    end
-
     local controller = ply:GetController()
 
     controller.LookAtTime = CurTime() + 2
