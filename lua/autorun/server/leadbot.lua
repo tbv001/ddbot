@@ -24,7 +24,7 @@ CONFIG END CONFIG END
 
 --]]-----
 
-include("leadbot/base.lua")
+include("leadbot/bot.lua")
 
 -- Modules
 
@@ -45,15 +45,4 @@ for k, v in pairs(dir) do
             end
         end
     end
-end
-
--- Configs
-
-local map = game.GetMap()
-local gamemode = engine.ActiveGamemode()
-
-if file.Find("leadbot/gamemodes/" .. map .. ".lua", "LUA")[1] then
-    include("leadbot/gamemodes/" .. map .. ".lua")
-elseif file.Find("leadbot/gamemodes/" .. gamemode .. ".lua", "LUA")[1] then
-    include("leadbot/gamemodes/" .. gamemode .. ".lua")
 end

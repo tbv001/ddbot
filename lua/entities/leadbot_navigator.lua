@@ -71,7 +71,7 @@ function ENT:CanSee(ply, fov)
 
 	-- TODO: we really should check worldspacecenter too
 	local owner = self:GetOwner()
-	if !IsValid(owner) then return false end
+	if not owner or not IsValid(owner) then return false end
 
 	return util.QuickTrace(owner:EyePos(), ply:EyePos() - owner:EyePos(), {owner, self}).Entity == ply
 end

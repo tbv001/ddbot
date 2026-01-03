@@ -5,8 +5,10 @@ LeadBot.TeamPlay = false -- don't hurt players on the bots team
 LeadBot.LerpAim = true -- interpolate aim (smooth aim)
 LeadBot.AFKBotOverride = false -- allows for gamemodes such as Dogfight which use IsBot() to pass real humans as bots
 LeadBot.SuicideAFK = false -- kill the player when entering/exiting afk
-LeadBot.NoFlashlight = false -- disable flashlight being enabled in dark areas
+LeadBot.NoFlashlight = true -- disable flashlight being enabled in dark areas
 LeadBot.Strategies = 1 -- how many strategies can the bot pick from
+LeadBot.SetModel = true
+LeadBot.Gamemode = "darkestdays"
 
 --[[ COMMANDS ]]--
 
@@ -249,18 +251,107 @@ function LeadBot.AddBotOverride(bot)
             LeadBot.TalkToMe(bot, "join")
         end)
     end
+
+    if GAMEMODE:GetGametype() == "ffa" then
+        bot:SetTeam(TEAM_FFA)
+    elseif GAMEMODE:GetGametype() == "ts" then
+        if GAMEMODE.DeadPeople[tostring(bot:SteamID())] or IsValid(GetHillEntity()) and GetHillEntity():GetTimer() <= TS_TIME * (1 - TS_DEADLINE) then
+            bot:SetTeam(TEAM_THUG)
+        else
+            bot:SetTeam(TEAM_BLUE)
+        end
+    else
+        if bot:CanJoinTeam(TEAM_RED) then
+            bot:SetTeam(TEAM_RED)
+        else
+            bot:SetTeam(TEAM_BLUE)
+        end
+    end
+
+    -- gamemode spawns us asap for some reason, let's try to override this and "pick our loadout"
+    bot:KillSilent()
+    bot:SetDeaths(0)
+    bot:SetTeamColor()
+    bot.NextSpawnTime = CurTime() + GetConVar("dd_options_spawn_time"):GetInt()
 end
 
 function LeadBot.AddBotControllerOverride(bot, controller)
 end
 
 function LeadBot.PlayerSpawn(bot)
+    if !bot:IsBot() then return end
+
+    local primaries = {}
+    local secondaries = {}
+    local _, spell1 = table.Random(Spells)
+    local _, spell2 = table.Random(Spells)
+    local _, perk = table.Random(Perks)
+    local build = table.Random(Builds)
+
+    for class, wep in pairs(Weapons) do
+        if wep.Melee then
+            table.insert(secondaries, class)
+        else
+            table.insert(primaries, class)
+        end
+    end
+
+    local primary, secondary = table.Random(primaries), table.Random(secondaries)
+
+    -- melee only person
+    if math.random(5) == 1 then
+        primary = "none"
+        build = Builds[table.Random({"healthy", "agile"})]
+        perk = "adrenaline"
+    end
+
+    bot.Loadout = {primary, secondary}
+    bot.SpellsToGive = {spell1, spell2}
+
+    if math.random(5) == 1 or perk == "adrenaline" then
+        bot.PerksToGive = {perk}
+    else
+        bot.PerksToGive = {"none"}
+    end
+
+    build.OnSet(bot)
+
+    timer.Simple(0, function()
+        if IsValid(bot) then
+            local model = string.lower(player_manager.TranslatePlayerModel(bot:LBGetModel()))
+            if table.HasValue(GAMEMODE.ModelBlacklist, model) then
+                model = "models/player/kleiner.mdl"
+            end
+
+            bot:SetModel(model)
+            bot:SetDTString(0, model)
+            bot:SetVoiceSet(VoiceSetTranslate[model] or "male")
+        end
+    end)
 end
 
+local gametype
+local door_enabled
+
+cvars.AddChangeCallback("dd_gametype", function(_, _, game)
+    if gametype then
+        gametype = game
+    end
+end)
+
 function LeadBot.Think()
-    for _, bot in pairs(player.GetBots()) do
+    if !gametype then
+        LeadBot.TeamPlay = GAMEMODE:GetGametype() ~= "ffa"
+        gametype = GAMEMODE:GetGametype()
+
+        if ents.FindByClass("prop_door_rotating")[1] then
+            door_enabled = true
+        end
+    end
+
+    for _, bot in pairs(player.GetAll()) do
         if bot:IsLBot() then
-            if LeadBot.RespawnAllowed and bot.NextSpawnTime and !bot:Alive() and bot.NextSpawnTime < CurTime() then
+            if bot.NextSpawnTime and !bot:Alive() and bot.NextSpawnTime < CurTime() then
                 bot:Spawn()
                 return
             end
@@ -268,7 +359,7 @@ function LeadBot.Think()
             local wep = bot:GetActiveWeapon()
             if IsValid(wep) then
                 local ammoty = wep:GetPrimaryAmmoType() or wep.Primary.Ammo
-                bot:SetAmmo(999, ammoty)
+                bot:SetAmmo(wep.Primary.DefaultClip, ammoty)
             end
         end
     end
@@ -277,37 +368,72 @@ end
 function LeadBot.PostPlayerDeath(bot)
 end
 
+local function botTalk(bot, cmd)
+    if !bot:Alive() then return end
+    if !VoiceAdvanced[bot:GetVoiceSet()].Commands[cmd] then return end
+
+    bot.NextCommand = bot.NextCommand or 0
+
+    if bot.NextCommand >= CurTime() then return end
+
+    bot.NextCommand = CurTime() + 7
+    bot:PlaySpeech(VoiceAdvanced[bot:GetVoiceSet()].Commands[cmd])
+end
+
 function LeadBot.PlayerHurt(ply, bot, hp, dmg)
-    if bot:IsPlayer() then
-        if hp <= dmg and math.random(3) == 1 and bot:IsLBot() then
-            LeadBot.TalkToMe(bot, "taunt")
-        end
-
-        local controller = ply:GetController()
-
-        controller.LookAtTime = CurTime() + 2
-        controller.LookAt = ((bot:GetPos() + VectorRand() * 128) - ply:GetPos()):Angle()
+    if hp <= dmg and math.random(4) == 1 and IsValid(bot) and bot:IsPlayer() and bot:IsLBot() then
+        -- LeadBot.TalkToMe(bot, "taunt")
+        botTalk(bot, "taunt")
     end
+
+    local controller = ply:GetController()
+
+    controller.LookAtTime = CurTime() + 2
+    controller.LookAt = ((bot:GetPos() + VectorRand() * 128) - ply:GetPos()):Angle()
+end
+
+function LeadBot.FindClosest(controller)
+    local players = team.GetPlayers(TEAM_BLUE)
+    local distance = 9999
+    local playing = players[1]
+    local distanceplayer = 9999999
+    for k, v in ipairs(players) do
+        if v:Alive() then
+            distanceplayer = v:GetPos():DistToSqr(controller:GetPos())
+            if distance > distanceplayer and v ~= controller then
+                distance = distanceplayer
+                playing = v
+            end
+        end
+    end
+
+    controller.Target = playing
 end
 
 function LeadBot.StartCommand(bot, cmd)
-    local buttons = IN_SPEED
+    local buttons = 0
     local botWeapon = bot:GetActiveWeapon()
     local controller = bot.ControllerBot
     local target = controller.Target
 
     if !IsValid(controller) then return end
 
-    if LeadBot.NoSprint then
-        buttons = 0
+    if not IsValid(target) then
+        buttons = buttons + IN_SPEED
     end
 
-    if IsValid(botWeapon) and (botWeapon:Clip1() == 0 or !IsValid(target) and botWeapon:Clip1() <= botWeapon:GetMaxClip1() / 2) then
-        buttons = buttons + IN_RELOAD
-    end
+    if IsValid(botWeapon) then
+        if (botWeapon:Clip1() == 0 or !IsValid(target) and botWeapon:Clip1() <= botWeapon:GetMaxClip1() / 2) then
+            buttons = buttons + IN_RELOAD
+        end
 
-    if IsValid(target) and math.random(2) == 1 then
-        buttons = buttons + IN_ATTACK
+        if IsValid(target) and (math.random(2) == 1 or botWeapon:GetClass() == "dd_striker") then
+            bot:SwitchSpell()
+            buttons = buttons + IN_ATTACK + ((!bot:IsThug() and IN_ATTACK2) or 0)
+            if math.random((botWeapon.Base == "dd_meleebase" and 6) or 16) == 1 then
+                buttons = buttons + IN_USE
+            end
+        end
     end
 
     if bot:GetMoveType() == MOVETYPE_LADDER then
@@ -332,15 +458,21 @@ function LeadBot.StartCommand(bot, cmd)
         buttons = buttons + IN_JUMP
     end
 
+    --[[if controller.MovingBack and math.random(6) == 1 then
+        buttons = buttons + IN_USE
+    end]]
+
     if !bot:IsOnGround() and controller.NextJump > CurTime() then
         buttons = buttons + IN_DUCK
     end
 
-    bot:SelectWeapon((IsValid(controller.Target) and controller.Target:GetPos():DistToSqr(controller:GetPos()) < 129000 and "weapon_shotgun") or "weapon_smg1")
+    -- bot:SelectWeapon((IsValid(controller.Target) and controller.Target:GetPos():DistToSqr(controller:GetPos()) < 129000 and "weapon_shotgun") or "weapon_smg1")
     cmd:ClearButtons()
     cmd:ClearMovement()
     cmd:SetButtons(buttons)
 end
+
+local objective
 
 function LeadBot.PlayerMove(bot, cmd, mv)
     local controller = bot.ControllerBot
@@ -351,6 +483,8 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         bot.ControllerBot:SetOwner(bot)
         controller = bot.ControllerBot
     end
+
+    local wep = bot:GetActiveWeapon()
 
     --[[local min, max = controller:GetModelBounds()
     debugoverlay.Box(controller:GetPos(), min, max, 0.1, Color(255, 0, 0, 0), true)]]
@@ -371,23 +505,30 @@ function LeadBot.PlayerMove(bot, cmd, mv)
 
     mv:SetForwardSpeed(1200)
 
-    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > CurTime()) or !IsValid(controller.Target) or controller.ForgetTarget < CurTime() or controller.Target:Health() < 1 then
+    local zombies = gametype == "ts"
+    local melee = IsValid(wep) and wep.Base == "dd_meleebase"
+
+    if ((bot.NextSpawnTime and bot.NextSpawnTime + 1 > CurTime()) or !IsValid(controller.Target) or controller.ForgetTarget < CurTime() or !controller.Target:Alive()) then
         controller.Target = nil
     end
 
     if !IsValid(controller.Target) then
-        for _, ply in ipairs(player.GetAll()) do
-            if ply ~= bot and ((ply:IsPlayer() and (!LeadBot.TeamPlay or (LeadBot.TeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(bot:GetPos()) < 2250000 then
-                --[[local targetpos = ply:EyePos() - Vector(0, 0, 10)
-                local trace = util.TraceLine({
-                    start = bot:GetShootPos(),
-                    endpos = targetpos,
-                    filter = function(ent) return ent == ply end
-                })]]
+        if zombies and bot:Team() == TEAM_THUG then
+            LeadBot.FindClosest(controller)
+        else
+            for _, ply in ipairs(player.GetAll()) do
+                if ply ~= bot and ((ply:IsPlayer() and (!LeadBot.TeamPlay or (LeadBot.TeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(bot:GetPos()) < 2250000 then
+                    --[[local targetpos = ply:EyePos() - Vector(0, 0, 10)
+                    local trace = util.TraceLine({
+                        start = bot:GetShootPos(),
+                        endpos = targetpos,
+                        filter = function(ent) return ent == ply end
+                    })]]
 
-                if ply:Alive() and controller:CanSee(ply) then
-                    controller.Target = ply
-                    controller.ForgetTarget = CurTime() + 2
+                    if ply:Alive() and controller:CanSee(ply) then
+                        controller.Target = ply
+                        controller.ForgetTarget = CurTime() + 2
+                    end
                 end
             end
         end
@@ -395,25 +536,71 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         controller.ForgetTarget = CurTime() + 2
     end
 
-    local dt = util.QuickTrace(bot:EyePos(), bot:GetForward() * 45, bot)
+    if door_enabled then
+        local dt = util.QuickTrace(bot:EyePos(), bot:GetForward() * 45, bot)
 
-    if IsValid(dt.Entity) and dt.Entity:GetClass() == "prop_door_rotating" then
-        dt.Entity:Fire("OpenAwayFrom", bot, 0)
+        if IsValid(dt.Entity) and dt.Entity:GetClass() == "prop_door_rotating" then
+            dt.Entity:Fire("OpenAwayFrom", bot, 0)
+        end
     end
 
-    if !IsValid(controller.Target) and (!controller.PosGen or bot:GetPos():DistToSqr(controller.PosGen) < 1000 or controller.LastSegmented < CurTime()) then
-        -- find a random spot on the map, and in 10 seconds do it again!
-        controller.PosGen = controller:FindSpot("random", {radius = 12500})
-        controller.LastSegmented = CurTime() + 10
-    elseif IsValid(controller.Target) then
+    -- controller.MovingBack = false
+
+    if !IsValid(controller.Target) and (!controller.PosGen or (gametype ~= "htf" and gametype ~= "koth" and bot:GetPos():DistToSqr(controller.PosGen) < 1000) or controller.LastSegmented < CurTime()) then
+        if gametype == "htf" then
+            if bot:IsCarryingFlag() then
+                controller.PosGen = controller:FindSpot("random", {radius = 12500})
+                controller.LastSegmented = CurTime() + 8
+            else
+                if !IsValid(objective) then
+                    objective = ents.FindByClass("htf_flag")[1]
+                end
+
+                local flag = objective
+                local rand = 64
+
+                if !IsValid(flag:GetCarrier()) then
+                    rand = 32
+                end
+
+                rand = VectorRand() * rand
+                controller.PosGen = flag:GetPos() + Vector(rand.x, rand.y, 0)
+                controller.LastSegmented = CurTime() + math.random(2, 3)
+            end
+        elseif gametype == "koth" then
+            if !IsValid(objective) then
+                objective = ents.FindByClass("koth_point")[1]
+            end
+
+            local point = objective
+            local point_pos = point:GetPos()
+            local rand = (point:GetRadius() - 12)
+
+            if IsValid(controller.Target) then
+                rand = rand * 1.25
+            end
+
+            rand = VectorRand() * rand
+            controller.PosGen = point_pos + Vector(rand.x, rand.y, 0)
+            controller.LastSegmented = CurTime() + math.random(3, 6)
+        else
+            -- find a random spot on the map, and in 10 seconds do it again!
+            controller.PosGen = controller:FindSpot("random", {radius = 12500})
+            controller.LastSegmented = CurTime() + 10
+        end
+    elseif IsValid(controller.Target) and ((gametype == "htf" and !bot:IsCarryingFlag()) or (gametype ~= "koth" and (bot:LBGetStrategy() ~= 1 or !melee)) or true) then
         -- move to our target
         local distance = controller.Target:GetPos():DistToSqr(bot:GetPos())
-        controller.PosGen = controller.Target:GetPos()
+        if controller.LastSegmented < CurTime() then
+            controller.PosGen = controller.Target:GetPos()
+            controller.LastSegmented = CurTime() + ((melee and math.Rand(0.7, 0.9)) or math.Rand(1.1, 1.3))
+        end
 
         -- back up if the target is really close
         -- TODO: find a random spot rather than trying to back up into what could just be a wall
         -- something like controller.PosGen = controller:FindSpot("random", {pos = bot:GetPos() - bot:GetForward() * 350, radius = 1000})?
-        if distance <= 90000 then
+        if !melee and distance <= 90000 then
+            -- controller.MovingBack = true
             mv:SetForwardSpeed(-1200)
         end
     end
@@ -444,22 +631,22 @@ function LeadBot.PlayerMove(bot, cmd, mv)
 
     local goalpos = curgoal.pos
 
-    -- waaay too slow during gamplay
-    --[[if bot:GetVelocity():Length2DSqr() <= 225 and controller.NextCenter == 0 and controller.NextCenter < CurTime() then
-        controller.NextCenter = CurTime() + math.Rand(0.5, 0.65)
-    end
+    local inobjective = false
 
-    if controller.NextCenter ~= 0 and controller.NextCenter < CurTime() then
-        if bot:GetVelocity():Length2DSqr() <= 225 then
-            controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
+    if gametype == "koth" then
+        if IsValid(objective) then
+            objective.radius2d = objective.radius2d or (objective:GetRadius() - 4) * (objective:GetRadius() - 4)
         end
 
-        controller.NextCenter = 0
-    end]]
+        inobjective = IsValid(objective) and objective:GetPos():DistToSqr(controller:GetPos()) <= objective.radius2d
+    end
 
-    if bot:GetVelocity():Length2DSqr() <= 225 then
+    if bot:GetVelocity():Length2DSqr() <= 225 and (gametype ~= "koth" or !inobjective) then
         if controller.NextCenter < CurTime() then
             controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
+            -- curgoal.pos = curgoal.area:GetCenter()
+            -- goalpos = segments[controller.cur_segment - 1].area:GetCenter()
+
             controller.NextCenter = CurTime() + math.Rand(0.3, 0.65)
         elseif controller.nextStuckJump < CurTime() then
             if !bot:Crouching() then
@@ -509,9 +696,22 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     mv:SetMoveAngles(mva)
 
     if IsValid(controller.Target) then
-        bot:SetEyeAngles(LerpAngle(lerp, bot:EyeAngles(), (controller.Target:EyePos() - bot:GetShootPos()):Angle()))
+        local targetpos = controller.Target:EyePos()
+        -- targetpos.z = math.random(controller.Target:GetPos().z, targetpos.z)
+        -- targetpos = targetpos + VectorRand() * 64
+
+        bot:SetEyeAngles(LerpAngle(lerp, bot:EyeAngles(), (targetpos - bot:GetShootPos()):Angle()))
         return
     else
+        if gametype == "koth" and inobjective then
+            mv:SetForwardSpeed(0)
+
+            if controller.LookAtTime < CurTime() then
+                controller.LookAt = Angle(math.random(-40, 40), math.random(-180, 180), 0)
+                controller.LookAtTime = CurTime() + math.Rand(0.9, 1.3)
+            end
+        end
+
         if controller.LookAtTime > CurTime() then
             local ang = LerpAngle(lerpc, bot:EyeAngles(), controller.LookAt)
             bot:SetEyeAngles(Angle(ang.p, ang.y, 0))
