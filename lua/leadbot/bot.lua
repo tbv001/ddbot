@@ -349,7 +349,7 @@ function LeadBot.Think()
         end
     end
 
-    for _, bot in pairs(player.GetAll()) do
+    for _, bot in player.Iterator() do
         if bot:IsLBot() then
             if bot.NextSpawnTime and !bot:Alive() and bot.NextSpawnTime < CurTime() then
                 bot:Spawn()
@@ -516,7 +516,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         if zombies and bot:Team() == TEAM_THUG then
             LeadBot.FindClosest(controller)
         else
-            for _, ply in ipairs(player.GetAll()) do
+            for _, ply in player.Iterator() do
                 if ply ~= bot and ((ply:IsPlayer() and (!LeadBot.TeamPlay or (LeadBot.TeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(bot:GetPos()) < 2250000 then
                     --[[local targetpos = ply:EyePos() - Vector(0, 0, 10)
                     local trace = util.TraceLine({
