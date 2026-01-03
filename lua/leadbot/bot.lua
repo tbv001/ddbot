@@ -15,111 +15,8 @@ LeadBot.Gamemode = "darkestdays"
 concommand.Add("leadbot_add", function(ply, _, args) if IsValid(ply) and !ply:IsSuperAdmin() then return end local amount = 1 if tonumber(args[1]) then amount = tonumber(args[1]) end for i = 1, amount do timer.Simple(i * 0.1, function() LeadBot.AddBot() end) end end, nil, "Adds a LeadBot")
 concommand.Add("leadbot_kick", function(ply, _, args) if !args[1] or IsValid(ply) and !ply:IsSuperAdmin() then return end if args[1] ~= "all" then for k, v in pairs(player.GetBots()) do if string.find(v:GetName(), args[1]) then v:Kick() return end end else for k, v in pairs(player.GetBots()) do v:Kick() end end end, nil, "Kicks LeadBots (all is avaliable!)")
 CreateConVar("leadbot_strategy", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Enables the strategy system for newly created bots.")
-CreateConVar("leadbot_names", "", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Bot names, seperated by commas.")
-CreateConVar("leadbot_models", "", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Bot models, seperated by commas.")
-CreateConVar("leadbot_name_prefix", "", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Bot name prefix")
 
 --[[ FUNCTIONS ]]--
-
-local name_Default = {
-    alyx = "Alyx Vance",
-    kleiner = "Isaac Kleiner",
-    breen = "Dr. Wallace Breen",
-    gman = "The G-Man",
-    odessa = "Odessa Cubbage",
-    eli = "Eli Vance",
-    monk = "Father Grigori",
-    mossman = "Judith Mossman",
-    mossmanarctic = "Judith Mossman",
-    barney = "Barney Calhoun",
-
-
-    dod_american = "American Soldier",
-    dod_german = "German Soldier",
-
-    css_swat = "GIGN",
-    css_leet = "Elite Crew",
-    css_arctic = "Artic Avengers",
-    css_urban = "SEAL Team Six",
-    css_riot = "GSG-9",
-    css_gasmask = "SAS",
-    css_phoenix = "Phoenix Connexion",
-    css_guerilla = "Guerilla Warfare",
-
-    hostage01 = "Art",
-    hostage02 = "Sandro",
-    hostage03 = "Vance",
-    hostage04 = "Cohrt",
-
-    police = "Civil Protection",
-    policefem = "Civil Protection",
-
-    chell = "Chell",
-
-    combine = "Combine Soldier",
-    combineprison = "Combine Prison Guard",
-    combineelite = "Elite Combine Soldier",
-    stripped = "Stripped Combine Soldier",
-
-    zombie = "Zombie",
-    zombiefast = "Fast Zombie",
-    zombine = "Zombine",
-    corpse = "Corpse",
-    charple = "Charple",
-    skeleton = "Skeleton",
-
-    male01 = "Van",
-    male02 = "Ted",
-    male03 = "Joe",
-    male04 = "Eric",
-    male05 = "Art",
-    male06 = "Sandro",
-    male07 = "Mike",
-    male08 = "Vance",
-    male09 = "Erdin",
-    male10 = "Van",
-    male11 = "Ted",
-    male12 = "Joe",
-    male13 = "Eric",
-    male14 = "Art",
-    male15 = "Sandro",
-    male16 = "Mike",
-    male17 = "Vance",
-    male18 = "Erdin",
-    female01 = "Joey",
-    female02 = "Kanisha",
-    female03 = "Kim",
-    female04 = "Chau",
-    female05 = "Naomi",
-    female06 = "Lakeetra",
-    female07 = "Joey",
-    female08 = "Kanisha",
-    female09 = "Kim",
-    female10 = "Chau",
-    female11 = "Naomi",
-    female12 = "Lakeetra",
-
-    medic01 = "Van",
-    medic02 = "Ted",
-    medic03 = "Joe",
-    medic04 = "Eric",
-    medic05 = "Art",
-    medic06 = "Sandro",
-    medic07 = "Mike",
-    medic08 = "Vance",
-    medic09 = "Erdin",
-    medic10 = "Joey",
-    medic11 = "Kanisha",
-    medic12 = "Kim",
-    medic13 = "Chau",
-    medic14 = "Naomi",
-    medic15 = "Lakeetra",
-
-    refugee01 = "Ted",
-    refugee02 = "Eric",
-    refugee03 = "Sandro",
-    refugee04 = "Vance",
-}
 
 function LeadBot.AddBot()
     if !navmesh.IsLoaded() and !LeadBot.NoNavMesh then
@@ -133,94 +30,18 @@ function LeadBot.AddBot()
     end
 
     local original_name
-    local generated = "Leadbot #" .. #player.GetBots() + 1
-    local model = ""
-    local color = Vector(-1, -1, -1)
-    local weaponcolor = Vector(0.30, 1.80, 2.10)
-    local strategy = 0
-
-    if GetConVar("leadbot_names"):GetString() ~= "" then
-        generated = table.Random(string.Split(GetConVar("leadbot_names"):GetString(), ","))
-    elseif GetConVar("leadbot_models"):GetString() == "" then
-        local name, _ = table.Random(player_manager.AllValidModels())
-        local translate = player_manager.TranslateToPlayerModelName(name)
-        name = translate
-
-        for _, ply in pairs(player.GetBots()) do
-            if ply.OriginalName == name or string.lower(ply:Nick()) == name or name_Default[name] and ply:Nick() == name_Default[name] then
-                name = ""
-            end
-        end
-
-        if name == "" then
-            local i = 0
-            while name == "" do
-                i = i + 1
-                local str = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
-                for _, ply in pairs(player.GetBots()) do
-                    if ply.OriginalName == str or string.lower(ply:Nick()) == str or name_Default[str] and ply:Nick() == name_Default[str] then
-                        str = ""
-                    end
-                end
-
-                if str == "" and i < #player_manager.AllValidModels() then continue end
-                name = str
-            end
-        end
-
-        original_name = name
-        model = name
-        name = string.lower(name)
-        name = name_Default[name] or name
-
-        local name_Generated = string.Split(name, "/")
-        name_Generated = name_Generated[#name_Generated]
-        name_Generated = string.Split(name_Generated, " ")
-
-        for i, namestr in pairs(name_Generated) do
-            name_Generated[i] = string.upper(string.sub(namestr, 1, 1)) .. string.sub(namestr, 2)
-        end
-
-        name_Generated = table.concat(name_Generated, " ")
-        generated = name_Generated
-    end
-
-    if LeadBot.PlayerColor == "default" then
-        generated = "Kleiner"
-    end
-
-    generated = GetConVar("leadbot_name_prefix"):GetString() .. generated
-
-    local name = LeadBot.Prefix .. generated
+    local name = "Bot #" .. #player.GetBots() + 1
+    local model = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
+    local botcolor = ColorRand()
+    local botweaponcolor = ColorRand()
+    local color = Vector(botcolor.r / 255, botcolor.g / 255, botcolor.b / 255)
+    local weaponcolor = Vector(botweaponcolor.r / 255, botweaponcolor.g / 255, botweaponcolor.b / 255)
+    local strategy = GetConVar("leadbot_strategy"):GetInt()
     local bot = player.CreateNextBot(name)
 
     if !IsValid(bot) then
         MsgN("[LeadBot] Unable to create bot!")
         return
-    end
-
-    if GetConVar("leadbot_strategy"):GetBool() then
-        strategy = math.random(0, LeadBot.Strategies)
-    end
-
-    if LeadBot.PlayerColor ~= "default" then
-        if model == "" then
-            if GetConVar("leadbot_models"):GetString() ~= "" then
-                model = table.Random(string.Split(GetConVar("leadbot_models"):GetString(), ","))
-            else
-                model = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
-            end
-        end
-
-        if color == Vector(-1, -1, -1) then
-            local botcolor = ColorRand()
-            local botweaponcolor = ColorRand()
-            color = Vector(botcolor.r / 255, botcolor.g / 255, botcolor.b / 255)
-            weaponcolor = Vector(botweaponcolor.r / 255, botweaponcolor.g / 255, botweaponcolor.b / 255)
-        end
-    else
-        model = "kleiner"
-        color = Vector(0.24, 0.34, 0.41)
     end
 
     bot.LeadBot_Config = {model, color, weaponcolor, strategy}
@@ -236,8 +57,6 @@ function LeadBot.AddBot()
     LeadBot.AddBotControllerOverride(bot, bot.ControllerBot)
     MsgN("[LeadBot] Bot " .. name .. " with strategy " .. bot.BotStrategy .. " added!")
 end
-
---[[ DEFAULT DM AI ]]--
 
 function LeadBot.AddBotOverride(bot)
     if math.random(2) == 1 then
