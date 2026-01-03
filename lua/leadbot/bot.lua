@@ -1,14 +1,6 @@
-LeadBot.RespawnAllowed = true -- allows bots to respawn automatically when dead
-LeadBot.PlayerColor = true -- disable this to get the default gmod style players
 LeadBot.NoNavMesh = false -- disable the nav mesh check
 LeadBot.TeamPlay = false -- don't hurt players on the bots team
 LeadBot.LerpAim = true -- interpolate aim (smooth aim)
-LeadBot.AFKBotOverride = false -- allows for gamemodes such as Dogfight which use IsBot() to pass real humans as bots
-LeadBot.SuicideAFK = false -- kill the player when entering/exiting afk
-LeadBot.NoFlashlight = true -- disable flashlight being enabled in dark areas
-LeadBot.Strategies = 1 -- how many strategies can the bot pick from
-LeadBot.SetModel = true
-LeadBot.Gamemode = "darkestdays"
 
 --[[ COMMANDS ]]--
 
@@ -19,7 +11,7 @@ CreateConVar("leadbot_strategy", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Enables th
 --[[ FUNCTIONS ]]--
 
 function LeadBot.AddBot()
-    if !navmesh.IsLoaded() and !LeadBot.NoNavMesh then
+    if !navmesh.IsLoaded() then
         ErrorNoHalt("There is no navmesh! Generate one using \"nav_generate\"!\n")
         return
     end
