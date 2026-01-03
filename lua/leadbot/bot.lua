@@ -18,7 +18,6 @@ CreateConVar("leadbot_strategy", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Enables th
 CreateConVar("leadbot_names", "", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Bot names, seperated by commas.")
 CreateConVar("leadbot_models", "", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Bot models, seperated by commas.")
 CreateConVar("leadbot_name_prefix", "", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Bot name prefix")
-CreateConVar("leadbot_fov", "0", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "LeadBot FOV\nSet to 0 to use the preset FOV.")
 
 --[[ FUNCTIONS ]]--
 
@@ -123,11 +122,6 @@ local name_Default = {
 }
 
 function LeadBot.AddBot()
-    if !FindMetaTable("NextBot").GetFOV then
-        ErrorNoHalt("You must be using the dev version of Garry's mod!\nhttps://wiki.facepunch.com/gmod/Dev_Branch\n")
-        return
-    end
-
     if !navmesh.IsLoaded() and !LeadBot.NoNavMesh then
         ErrorNoHalt("There is no navmesh! Generate one using \"nav_generate\"!\n")
         return

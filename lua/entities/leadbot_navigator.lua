@@ -64,16 +64,15 @@ function ENT:Health()
 	return nil
 end
 
-function ENT:CanSee(ply, fov)
-	if ply:GetPos():DistToSqr(self:GetPos()) > self:GetMaxVisionRange() * self:GetMaxVisionRange() then
+function ENT:CanSee(ply)
+	local pos = self:GetPos() + Vector(0, 0, 32)
+	local filter = {self}
+
+	if not pos then
 		return false
 	end
 
-	-- TODO: we really should check worldspacecenter too
-	local owner = self:GetOwner()
-	if not owner or not IsValid(owner) then return false end
-
-	return util.QuickTrace(owner:EyePos(), ply:EyePos() - owner:EyePos(), {owner, self}).Entity == ply
+	return util.QuickTrace(pos, (ply:GetPos() + Vector(0, 0, 32)) - pos, filter).Entity == ply
 end
 
 function ENT:RunBehaviour()

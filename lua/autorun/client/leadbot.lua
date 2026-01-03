@@ -1,7 +1,6 @@
---if game.SinglePlayer() or SERVER then return end
+if game.SinglePlayer() or engine.ActiveGamemode() ~= "darkestdays" then return end
 
 -- Modules
-
 local _, dir = file.Find("leadbot/modules/*", "LUA")
 
 for k, v in pairs(dir) do

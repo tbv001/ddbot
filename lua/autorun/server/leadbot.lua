@@ -1,33 +1,15 @@
---if game.SinglePlayer() or CLIENT then return end
+if game.SinglePlayer() or engine.ActiveGamemode() ~= "darkestdays" then return end
 
+-- Config
 LeadBot = {}
 LeadBot.NoNavMesh = {}
-LeadBot.Models = {} -- Models, leave as {} if random is desired
-
---[[-----
-
-CONFIG START CONFIG START
-CONFIG START CONFIG START
-CONFIG START CONFIG START
-
---]]-----
-
--- Name Prefix
-
+LeadBot.Models = {}
 LeadBot.Prefix = ""
 
---[[-----
-
-CONFIG END CONFIG END
-CONFIG END CONFIG END
-CONFIG END CONFIG END
-
---]]-----
-
+-- Core
 include("leadbot/bot.lua")
 
 -- Modules
-
 local _, dir = file.Find("leadbot/modules/*", "LUA")
 
 for k, v in pairs(dir) do
