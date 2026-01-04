@@ -23,6 +23,8 @@ function ENT:Initialize()
 	self.goalPos = Vector(0, 0, 0)
 	self.strafeAngle = 0
 	self.nextStuckJump = 0
+	self.NextCombatMove = 0
+	self.CombatStrafeDir = 0
 
 	if LeadBot.AddControllerOverride then
 		LeadBot.AddControllerOverride(self)
