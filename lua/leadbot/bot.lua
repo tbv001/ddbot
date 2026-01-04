@@ -3,6 +3,9 @@
 LeadBot.TeamPlay = false -- don't hurt players on the bots team
 LeadBot.LerpAim = true -- interpolate aim (smooth aim)
 
+local objective
+local gametype
+local door_enabled
 
 --[[ COMMANDS ]]--
 
@@ -161,9 +164,6 @@ function LeadBot.PlayerSpawn(bot)
     end)
 end
 
-local gametype
-local door_enabled
-
 cvars.AddChangeCallback("dd_gametype", function(_, _, game)
     if gametype then
         gametype = game
@@ -199,29 +199,13 @@ end
 function LeadBot.PostPlayerDeath(bot)
 end
 
-function LeadBot.PlayerHurt(ply, bot, hp, dmg)
+function LeadBot.PlayerHurt(ply, att, hp, dmg)
     local controller = ply:GetController()
 
-    controller.LookAtTime = CurTime() + 2
-    controller.LookAt = ((bot:GetPos() + VectorRand() * 128) - ply:GetPos()):Angle()
-end
-
-function LeadBot.FindClosest(controller)
-    local players = team.GetPlayers(TEAM_BLUE)
-    local distance = 9999
-    local playing = players[1]
-    local distanceplayer = 9999999
-    for k, v in ipairs(players) do
-        if v:Alive() then
-            distanceplayer = v:GetPos():DistToSqr(controller:GetPos())
-            if distance > distanceplayer and v ~= controller then
-                distance = distanceplayer
-                playing = v
-            end
-        end
+    if not IsValid(controller.Target) then
+        controller.Target = att
+        controller.ForgetTarget = CurTime() + 2
     end
-
-    controller.Target = playing
 end
 
 function LeadBot.StartCommand(bot, cmd)
@@ -281,8 +265,6 @@ function LeadBot.StartCommand(bot, cmd)
     cmd:SetButtons(buttons)
 end
 
-local objective
-
 function LeadBot.CanSee(bot, target)
     if not IsValid(bot) or not IsValid(target) then return false end
 
@@ -300,6 +282,7 @@ end
 
 function LeadBot.PlayerMove(bot, cmd, mv)
     local controller = bot.ControllerBot
+    local maxSpeed = mv:GetMaxSpeed() or 1500
 
     if !IsValid(controller) then
         bot.ControllerBot = ents.Create("leadbot_navigator")
@@ -324,7 +307,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         controller:SetAngles(bot:EyeAngles())
     end
 
-    mv:SetForwardSpeed(1200)
+    mv:SetForwardSpeed(maxSpeed)
 
     local zombies = gametype == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
@@ -333,17 +316,27 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         controller.Target = nil
     end
 
-    if !IsValid(controller.Target) then
-        if zombies and bot:Team() == TEAM_THUG then
-            LeadBot.FindClosest(controller)
-        else
-            for _, ply in player.Iterator() do
-                if ply ~= bot and ((ply:IsPlayer() and (!LeadBot.TeamPlay or (LeadBot.TeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(bot:GetPos()) < 2250000 then
-                    if ply:Alive() and LeadBot.CanSee(bot, ply) then
-                        controller.Target = ply
-                        controller.ForgetTarget = CurTime() + 2
-                    end
+    if not IsValid(controller.Target) then
+        local targets = {}
+        local botPos = bot:GetPos()
+
+        for _, ply in player.Iterator() do
+            if ply ~= bot and ((ply:IsPlayer() and (!LeadBot.TeamPlay or (LeadBot.TeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(botPos) < 2250000 then
+                if ply:Alive() then
+                    table.insert(targets, ply)
                 end
+            end
+        end
+
+        table.sort(targets, function(a, b)
+            return a:GetPos():DistToSqr(botPos) < b:GetPos():DistToSqr(botPos)
+        end)
+
+        for _, ply in ipairs(targets) do
+            if LeadBot.CanSee(bot, ply) then
+                controller.Target = ply
+                controller.ForgetTarget = CurTime() + 2
+                break
             end
         end
     elseif controller.ForgetTarget < CurTime() and LeadBot.CanSee(bot, controller.Target) then
@@ -410,7 +403,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
 
         -- Back up if the target is really close
         if !melee and distance <= 90000 then
-            mv:SetForwardSpeed(-1200)
+            mv:SetForwardSpeed(-maxSpeed)
         end
     end
 
@@ -463,11 +456,11 @@ function LeadBot.PlayerMove(bot, cmd, mv)
 
     if controller.NextCenter > CurTime() then
         if controller.strafeAngle == 1 then
-            mv:SetSideSpeed(1500)
+            mv:SetSideSpeed(maxSpeed)
         elseif controller.strafeAngle == 2 then
-            mv:SetSideSpeed(-1500)
+            mv:SetSideSpeed(-maxSpeed)
         else
-            mv:SetForwardSpeed(-1500)
+            mv:SetForwardSpeed(-maxSpeed)
         end
     end
 
@@ -553,12 +546,12 @@ hook.Add("PostPlayerDeath", "LeadBot_Death", function(bot)
 end)
 
 hook.Add("EntityTakeDamage", "LeadBot_Hurt", function(ply, dmgi)
-    local bot = dmgi:GetAttacker()
+    local att = dmgi:GetAttacker()
     local hp = ply:Health()
     local dmg = dmgi:GetDamage()
 
     if IsValid(ply) and ply:IsPlayer() and ply:IsLBot() then
-        LeadBot.PlayerHurt(ply, bot, hp, dmg)
+        LeadBot.PlayerHurt(ply, att, hp, dmg)
     end
 end)
 
