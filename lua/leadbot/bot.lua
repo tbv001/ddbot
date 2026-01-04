@@ -213,14 +213,16 @@ function LeadBot.StartCommand(bot, cmd)
         end
 
         if IsValid(target) then
-            buttons = buttons + IN_ATTACK
-            if math.random(2) == 1 and not bot:IsThug() then
+            if controller.NextAttack2 < CurTime() and math.random(3) == 1 and not bot:IsThug() then
                 buttons = buttons + IN_ATTACK2
+                if math.random(2) == 1 then
+                    bot:SwitchSpell()
+                end
+                controller.NextAttack = CurTime() + 2
+                controller.NextAttack2 = CurTime() + 5
+            elseif controller.NextAttack < CurTime() then
+                buttons = buttons + IN_ATTACK
             end
-        end
-
-        if math.random(5) == 1 then
-            bot:SwitchSpell()
         end
     end
 
