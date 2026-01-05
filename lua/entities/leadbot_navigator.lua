@@ -15,6 +15,7 @@ function ENT:Initialize()
 	self.NextDuck = 0
 	self.cur_segment = 2
 	self.Target = nil
+	self.CurTargetPos = nil
 	self.LastSegmented = 0
 	self.ForgetTarget = 0
 	self.NextCenter = 0
@@ -27,7 +28,9 @@ function ENT:Initialize()
 	self.CombatStrafeDir = 0
 	self.NextAttack = 0
 	self.NextAttack2 = 0
-	self.LadderJump = false
+	self.NextAttack2Delay = 0
+	self.NextChangeSpell = 0
+	self.NextLadderJump = 0
 
 	if LeadBot.AddControllerOverride then
 		LeadBot.AddControllerOverride(self)
@@ -48,7 +51,7 @@ function ENT:ChasePos()
 			self.cur_segment = 2
 		end
 
-		coroutine.wait(1)
+		coroutine.wait(0.1)
 		coroutine.yield()
 	end
 end
