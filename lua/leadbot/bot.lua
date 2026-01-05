@@ -213,15 +213,24 @@ function LeadBot.StartCommand(bot, cmd)
         end
 
         if IsValid(target) then
-            if controller.NextAttack2 < CurTime() and math.random(3) == 1 and not bot:IsThug() then
-                buttons = buttons + IN_ATTACK2
-                if math.random(2) == 1 then
-                    bot:SwitchSpell()
+            local aimVec = bot:GetAimVector()
+            local targetPos = target:WorldSpaceCenter()
+            local targetDir = (targetPos - bot:WorldSpaceCenter()):GetNormalized()
+
+            if aimVec:Dot(targetDir) > 0.95 then
+                if controller.NextAttack2 < CurTime() and math.random(3) == 1 and not bot:IsThug() and botWeapon:GetClass() ~= "dd_striker" then
+                    buttons = buttons + IN_ATTACK2
+                    if math.random(2) == 1 then
+                        bot:SwitchSpell()
+                    end
+                    controller.NextAttack = CurTime() + 2
+                    controller.NextAttack2 = CurTime() + 5
+                elseif controller.NextAttack < CurTime() and ((melee and bot:GetPos():DistToSqr(target:GetPos()) < 10000) or not melee) then
+                    buttons = buttons + IN_ATTACK
+                    if botWeapon:GetClass() ~= "dd_striker" then
+                        controller.NextAttack = CurTime() + 0.05
+                    end
                 end
-                controller.NextAttack = CurTime() + 2
-                controller.NextAttack2 = CurTime() + 5
-            elseif controller.NextAttack < CurTime() then
-                buttons = buttons + IN_ATTACK
             end
         end
     end
@@ -237,8 +246,13 @@ function LeadBot.StartCommand(bot, cmd)
         end
 
         controller.LookAtTime = CurTime() + 0.1
-        controller.NextJump = -1
+        if not controller.LadderJump then
+            controller.LadderJump = true
+            controller.NextJump = CurTime() + 2
+        end
         buttons = buttons + IN_FORWARD
+    else
+        controller.LadderJump = false
     end
 
     if controller.NextDuck > CurTime() then

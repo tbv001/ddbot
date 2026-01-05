@@ -27,6 +27,7 @@ function ENT:Initialize()
 	self.CombatStrafeDir = 0
 	self.NextAttack = 0
 	self.NextAttack2 = 0
+	self.LadderJump = false
 
 	if LeadBot.AddControllerOverride then
 		LeadBot.AddControllerOverride(self)
