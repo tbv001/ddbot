@@ -188,9 +188,9 @@ end
 function LeadBot.PlayerHurt(ply, att, hp, dmg)
     local controller = ply:GetController()
 
-    if not IsValid(controller.Target) then
+    if not IsValid(controller.Target) and (LeadBot.TeamPlay and (ply:Team() ~= att:Team()) or not LeadBot.TeamPlay) then
         controller.Target = att
-        controller.ForgetTarget = CurTime() + 5
+        controller.ForgetTarget = CurTime() + 2
         controller.LookAt = (att:GetPos() - controller:GetPos()):Angle()
         controller.LookAtTime = CurTime() + 1
     elseif controller.Target == att then
@@ -364,14 +364,14 @@ function LeadBot.PlayerMove(bot, cmd, mv)
             visibleTargetPos = LeadBot.GetVisibleHitbox(bot, ply, {bot, controller})
             if visibleTargetPos then
                 controller.Target = ply
-                controller.ForgetTarget = CurTime() + 5
+                controller.ForgetTarget = CurTime() + 2
                 break
             end
         end
     elseif controller.ForgetTarget > CurTime() then
         visibleTargetPos = LeadBot.GetVisibleHitbox(bot, controller.Target, {bot, controller})
         if visibleTargetPos then
-            controller.ForgetTarget = CurTime() + 5
+            controller.ForgetTarget = CurTime() + 2
         end
     end
 
@@ -384,11 +384,11 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     end
 
     if gametype == "koth" then
-        if IsValid(objective) then
-            objective.radius2d = objective.radius2d or (objective:GetRadius() - 4) * (objective:GetRadius() - 4)
+        if objective and IsValid(objective) then
+            objective.radius2d = objective.radius2d or (objective:GetRadius() - 12) * (objective:GetRadius() - 12)
         end
 
-        inobjective = IsValid(objective) and objective:GetPos():DistToSqr(controller:GetPos()) <= objective.radius2d
+        inobjective = objective and IsValid(objective) and objective:GetPos():DistToSqr(controller:GetPos()) <= objective.radius2d
     end
 
     if not IsValid(controller.Target) and (not controller.PosGen or (gametype ~= "htf" and gametype ~= "koth" and bot:GetPos():DistToSqr(controller.PosGen) < 1000) or controller.LastSegmented < CurTime()) then
@@ -560,6 +560,10 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     end
 
     if IsValid(controller.Target) and visibleTargetPos then
+        if gametype == "koth" and inobjective and not melee then
+            mv:SetForwardSpeed(0)
+        end
+
         bot:SetEyeAngles(LerpAngle(lerp, bot:EyeAngles(), (visibleTargetPos - bot:GetShootPos()):Angle()))
     else
         if gametype == "koth" and inobjective then
