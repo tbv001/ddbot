@@ -1,24 +1,80 @@
+local M_Player = FindMetaTable("Player")
+
 -- https://github.com/Necrossin/darkestdays/blob/master/gamemode/obj_player_extend.lua#L165
 function RunningCheck(bot)
-    local walkSpeed = bot:GetWalkSpeed()
-    return bot:GetVelocity():LengthSqr() >= (math.pow(walkSpeed, 2) + 2500 - 100)
+    return M_Player.IsRunning(bot)
 end
 
--- https://github.com/Necrossin/darkestdays/blob/master/gamemode/animations.lua#L43
-function CalcMainActivityBots(bot, vel)
-    if bot:IsBot() then
-        local wep = bot:GetActiveWeapon()
+-- https://github.com/Necrossin/darkestdays/blob/master/gamemode/animations.lua
+local M_Entity = FindMetaTable("Entity")
+local P_AnimRestartGesture = M_Player.AnimRestartGesture
+local P_AnimRestartMainSequence = M_Player.AnimRestartMainSequence
+local P_Crouching = M_Player.Crouching
+local P_IsSprinting = M_Player.IsSprinting
+local P_IsCrow = M_Player.IsCrow
+local E_LookupSequence = M_Entity.LookupSequence
+local P_GetActiveWeapon = M_Player.GetActiveWeapon
+local E_OnGround = M_Entity.OnGround
+local E_GetTable = M_Entity.GetTable
+local E_WaterLevel = M_Entity.WaterLevel
 
-        if RunningCheck(bot) then
-            local sequence = "run_all_charging"
-            if IsValid(wep) then
-                if wep.RunSequence then
-                    sequence = wep:RunSequence()
+local M_Vector = FindMetaTable("Vector")
+local V_Length2DSqr = M_Vector.Length2DSqr
+local V_LengthSqr = M_Vector.LengthSqr
+
+function CalcMainActivityBots( pl, velocity )
+    if pl:IsBot() then
+        pt = E_GetTable(pl)
+        onground = E_OnGround(pl)
+
+        if P_IsCrow and P_IsCrow(pl) then
+            local iSeq, iIdeal = E_LookupSequence( pl, "Idle01" )
+            local fVelocity = V_LengthSqr( velocity )
+            
+            if onground then
+                if fVelocity > 1 then 
+                    iSeq = E_LookupSequence( pl, "Run" )
+                else
+                    iSeq = E_LookupSequence( pl, "Idle01" )
+                end
+            else
+                if fVelocity > 1 then
+                    iSeq = E_LookupSequence( pl, "Fly01" )
+                else
+                    iSeq = E_LookupSequence( pl, "Fly01" )
                 end
             end
-            return ACT_MP_RUN, bot:LookupSequence(sequence)
+            
+            return iIdeal, iSeq
+            
         end
+        
+        if pl._efSlide and IsValid(pl._efSlide) then
+            local iIdeal, iSeq = ACT_MP_SWIM, -1
+            return iIdeal, iSeq
+        end
+        
+        local wep = P_GetActiveWeapon( pl )
+        local nosprint = IsValid(wep) and wep.IgnoreSprint
+        local sequence = "run_all_charging"
+        if wep.RunSequence then
+            sequence = wep:RunSequence()
+        end
+        
+        len2d = V_Length2DSqr(velocity)
 
+        
+        local is_wallrunning = pl._efWallRun and pl._efWallRun.IsActive and pl._efWallRun:IsActive()
+        
+        if ( P_IsSprinting( pl ) or is_wallrunning ) and len2d > 44100 then
+            local iIdeal, iSeq = ACT_MP_RUN, -1
+            if not nosprint then
+                iSeq = E_LookupSequence( pl, sequence )
+            end
+            
+            return iIdeal, iSeq
+        end
+        
         if IsValid(wep) and wep.CalcMainActivity then
             local iIdeal, iSeq = wep:CalcMainActivity(vel)
             if iIdeal and iSeq then
@@ -26,27 +82,23 @@ function CalcMainActivityBots(bot, vel)
             end
         end
 
-        local len2d = vel:Length2DSqr()
-        local onground = bot:OnGround()
-        local pt = bot:GetTable()
-
+        onground = E_OnGround(pl)
         if onground and not pt.m_bWasOnGround then
-            bot:AnimRestartGesture(GESTURE_SLOT_JUMP, ACT_LAND, true)
+            P_AnimRestartGesture(pl, GESTURE_SLOT_JUMP, ACT_LAND, true)
             pt.m_bWasOnGround = true
         end
 
-        local waterlevel = bot:WaterLevel()
-
+        waterlevel = E_WaterLevel(pl)
         if pt.m_bJumping then
             if pt.m_bFirstJumpFrame then
                 pt.m_bFirstJumpFrame = false
-                bot:AnimRestartMainSequence()
+                P_AnimRestartMainSequence(pl)
             end
 
-            if waterlevel >= 2 or (CurTime() - (pt.m_flJumpStartTime or 0)) > 0.2 and onground then
+            if waterlevel >= 2 or CurTime() - pt.m_flJumpStartTime > 0.2 and onground then
                 pt.m_bJumping = false
                 pt.m_fGroundTime = nil
-                bot:AnimRestartMainSequence()
+                P_AnimRestartMainSequence(pl)
             else
                 return ACT_MP_JUMP, -1
             end
@@ -60,7 +112,7 @@ function CalcMainActivityBots(bot, vel)
             end
         end
 
-        if bot:Crouching() then
+        if P_Crouching(pl) then
             if len2d >= 1 then
                 return ACT_MP_CROUCHWALK, -1
             end
