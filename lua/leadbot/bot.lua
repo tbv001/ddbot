@@ -242,13 +242,17 @@ function LeadBot.GetVisibleHitbox(bot, target, ignore)
 end
 
 function LeadBot.StartCommand(bot, cmd)
-    local buttons = IN_SPEED
+    local buttons = 0
     local botWeapon = bot:GetActiveWeapon()
     local melee = IsValid(botWeapon) and botWeapon.Base == "dd_meleebase"
     local controller = bot.ControllerBot
     local target = controller.Target
 
     if !IsValid(controller) then return end
+
+    if controller.NextAttack2 > CurTime() then
+        buttons = buttons + IN_SPEED
+    end
 
     if ((controller.NextSlideTime < CurTime() and math.random(5) == 1) or controller.CurSlideTime > CurTime()) and RunningCheck(bot) then
         if controller.CurSlideTime < CurTime() then
@@ -273,7 +277,7 @@ function LeadBot.StartCommand(bot, cmd)
             local targetPos = target:WorldSpaceCenter()
             local targetDir = (targetPos - bot:WorldSpaceCenter()):GetNormalized()
 
-            if controller.NextAttack2Delay < CurTime() and math.random(3) == 1 and botWeapon:GetClass() == "dd_striker" and not bot:IsThug() then
+            if controller.NextAttack2Delay < CurTime() and math.random(3) == 1 and botWeapon:GetClass() ~= "dd_striker" and not bot:IsThug() then
                 controller.NextAttack2 = CurTime() + 2
                 controller.NextAttack2Delay = CurTime() + 5
             end
