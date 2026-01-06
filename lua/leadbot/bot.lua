@@ -194,7 +194,7 @@ function LeadBot.PlayerHurt(ply, att, hp, dmg)
 
     local controller = ply:GetController()
 
-    if not IsValid(controller.Target) and (LeadBot.TeamPlay and (ply:Team() ~= att:Team()) or not LeadBot.TeamPlay) then
+    if not IsValid(controller.Target) and (LeadBot.TeamPlay and ply.Team and att.Team and (ply:Team() ~= att:Team()) or not LeadBot.TeamPlay) then
         controller.Target = att
         controller.ForgetTarget = CurTime() + 2
         controller.LookAt = (att:GetPos() - controller:GetPos()):Angle()
@@ -241,19 +241,78 @@ function LeadBot.GetVisibleHitbox(bot, target, ignore)
     return nil
 end
 
+-- https://github.com/Necrossin/darkestdays/blob/master/entities/entities/effect_grenade/shared.lua#L96
+function LeadBot.ThrowNade(bot)
+    local wep = bot:GetActiveWeapon()
+	
+	if bot.IsCrow and bot:IsCrow() then return end
+	
+	if IsValid(wep) then
+		if bot:IsSprinting() then return end
+		if wep.IsCasting and wep:IsCasting() then return end
+		if wep.IsReloading and wep:IsReloading() then return end
+		if wep.GetNextReload and wep:GetNextReload() > CurTime() then return end
+		if wep.IsAttacking and wep:IsAttacking() then return end
+		if wep.IsBlocking and wep:IsBlocking() then return end
+		
+		if wep.SetSpellEnd then
+			wep:SetSpellEnd(CurTime() + 0.65)
+		end
+	end
+
+	local ent = ents.Create("npc_grenade_frag")
+	if IsValid(ent) then
+		local v = bot:GetShootPos()
+		v = v + bot:GetForward() * 5
+		v = v + bot:GetRight() * -8
+		v = v + bot:GetUp() * -4
+		ent:SetPos(v)
+		local ang = bot:GetAngles()
+		ent:SetAngles(ang)
+		ent:SetOwner(bot)
+		ent:Activate()
+		ent:Spawn()
+		ent:SetSaveValue("m_hThrower", bot )
+		local col = team.GetColor(bot:Team())
+		col.a = 255
+		
+		ent:SetMaterial("models/shiny")
+		ent:SetColor(col)
+		
+		ent:SetSaveValue("m_flDamage", 115 )
+		ent:SetSaveValue("m_DmgRadius", 280 )
+
+		ent:Fire("SetTimer",1.8,0)
+		ent:SetModelScale( 1.5, 0 )
+
+		local phys = ent:GetPhysicsObject()
+		if phys:IsValid() then
+			phys:Wake()
+			phys:SetVelocity(bot:GetVelocity()+bot:GetAimVector() * 900)
+			phys:AddAngleVelocity(Vector(600,math.random(-1200,1200),0))
+		end
+
+		bot:PlayGesture(ACT_GMOD_GESTURE_ITEM_DROP)
+		ent:EmitSound( "weapons/slam/throw.wav" )
+	end
+end
+
 function LeadBot.StartCommand(bot, cmd)
     local buttons = 0
     local botWeapon = bot:GetActiveWeapon()
     local melee = IsValid(botWeapon) and botWeapon.Base == "dd_meleebase"
     local controller = bot.ControllerBot
     local target = controller.Target
+    local aboutToThrowNade = controller.NextNadeThrowTime < CurTime() and math.random(5) == 1 and not melee and not bot:IsThug()
 
     if !IsValid(controller) then return end
 
-    if controller.NextAttack2 < CurTime() then
+    -- Sprint when not casting spells
+    if controller.NextAttack2 < CurTime() and not aboutToThrowNade then
         buttons = buttons + IN_SPEED
     end
 
+    -- Slide
     if ((controller.NextSlideTime < CurTime() and math.random(5) == 1) or controller.CurSlideTime > CurTime()) and RunningCheck(bot) then
         if controller.CurSlideTime < CurTime() then
             controller.CurSlideTime = CurTime() + 1
@@ -267,6 +326,7 @@ function LeadBot.StartCommand(bot, cmd)
             buttons = buttons + IN_RELOAD
         end
 
+        -- Change spell
         if controller.NextChangeSpell < CurTime() and math.random(3) == 1 and not bot:IsThug() and botWeapon:GetClass() ~= "dd_striker" then
             bot:SwitchSpell()
             controller.NextChangeSpell = CurTime() + 5
@@ -284,16 +344,23 @@ function LeadBot.StartCommand(bot, cmd)
 
             if aimVec:Dot(targetDir) > 0.9 and controller.NextAttack < CurTime() and controller.ShootReactionTime < CurTime() then
                 if melee and bot:GetPos():DistToSqr(target:GetPos()) < 10000 or not melee then
-                    buttons = buttons + IN_ATTACK + (not bot:IsThug() and botWeapon:GetClass() ~= "dd_striker" and controller.NextAttack2 > CurTime() and IN_ATTACK2 or 0)
+                    buttons = buttons + IN_ATTACK + (not bot:IsThug() and botWeapon:GetClass() ~= "dd_striker" and not aboutToThrowNade and controller.NextAttack2 > CurTime() and IN_ATTACK2 or 0)
 
                     if botWeapon:GetClass() ~= "dd_striker" then
                         controller.NextAttack = CurTime() + 0.05
                     end
                 end
 
-                if controller.NextDiveTime < CurTime() and math.random(5) == 1 then
+                -- Dive
+                if controller.NextDiveTime < CurTime() and math.random(10) == 1 then
                     controller.NextDiveTime = CurTime() + math.random(4, 10)
-                    bot:Dive()
+                    buttons = buttons + IN_WALK
+                end
+
+                -- Throw nade
+                if aboutToThrowNade then
+                    LeadBot.ThrowNade(bot)
+                    controller.NextNadeThrowTime = CurTime() + math.random(12, 20)
                 end
             end
         else
@@ -338,7 +405,7 @@ end
 
 function LeadBot.PlayerMove(bot, cmd, mv)
     local controller = bot.ControllerBot
-    local maxSpeed = 9999 --mv:GetMaxSpeed() or 1500
+    local maxSpeed = 9999
     local inobjective = false
     local visibleTargetPos
 
@@ -635,7 +702,7 @@ hook.Add("EntityTakeDamage", "LeadBot_Hurt", function(ply, dmgi)
     local hp = ply:Health()
     local dmg = dmgi:GetDamage()
 
-    if IsValid(ply) and ply:IsPlayer() and ply:IsLBot() then
+    if IsValid(ply) and ply:IsPlayer() and ply:IsBot() and ply ~= att then
         LeadBot.PlayerHurt(ply, att, hp, dmg)
     end
 end)
