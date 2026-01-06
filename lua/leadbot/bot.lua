@@ -8,6 +8,7 @@ LeadBot.LerpAim = true -- interpolate aim (smooth aim)
 local objective
 local gametype
 local door_enabled
+local entityLoaded = false
 
 --[[ COMMANDS ]]--
 
@@ -48,6 +49,10 @@ end, nil, "Kicks LeadBots (all is avaliable!)")
 --[[ FUNCTIONS ]]--
 
 function LeadBot.AddBot()
+    if not entityLoaded then
+        return
+    end
+
     if !navmesh.IsLoaded() then
         MsgN("There is no navmesh! Generate one using \"nav_generate\"!\n")
         return
@@ -187,25 +192,73 @@ function LeadBot.Think()
     end
 end
 
+function LeadBot.PlayerDeath(bot, inflictor, attacker)
+    if not bot:IsBot() then return end
+
+    for _, ent in ents.Iterator() do
+        if ent:GetClass() == "npc_grenade_frag" and ent:GetSaveTable().m_hThrower == bot then
+            ent:Remove()
+        end
+    end
+end
+
 function LeadBot.PlayerHurt(ply, att, hp, dmg)
     if not IsValid(ply) or not IsValid(att) then
         return
     end
 
+    if LeadBot.TeamPlay and ply.Team and att.Team and (ply:Team() == att:Team()) then
+        return
+    end
+
+    if ply == att then
+        return
+    end
+
+    if not ply:Alive() or not att:Alive() then
+        return
+    end
+
     local controller = ply:GetController()
 
-    if not IsValid(controller.Target) and (LeadBot.TeamPlay and ply.Team and att.Team and (ply:Team() ~= att:Team()) or not LeadBot.TeamPlay) then
+    if not IsValid(controller.Target) then
         controller.Target = att
         controller.ForgetTarget = CurTime() + 2
         controller.LookAt = (att:GetPos() - controller:GetPos()):Angle()
         controller.LookAtTime = CurTime() + 1
-    elseif controller.Target == att then
-        controller.LookAt = (att:GetPos() - controller:GetPos()):Angle()
-        controller.LookAtTime = CurTime() + 1
+    else
+        if IsValid(controller.Target) and controller.Target == att then
+            controller.LookAt = (att:GetPos() - controller:GetPos()):Angle()
+            controller.LookAtTime = CurTime() + 1
+        end
+
+        if IsValid(controller.Target) and controller.Target ~= att and controller:GetPos():DistToSqr(controller.Target:GetPos()) > controller:GetPos():DistToSqr(att:GetPos()) then
+            controller.Target = att
+            controller.ForgetTarget = CurTime() + 2
+            controller.LookAt = (att:GetPos() - controller:GetPos()):Angle()
+            controller.LookAtTime = CurTime() + 1
+        end
     end
 end
 
-function LeadBot.GetVisibleHitbox(bot, target, ignore)
+function LeadBot.IsObjectVisible(bot, obj, objClass, ignore)
+    if not IsValid(obj) or not IsValid(bot) then return nil end
+
+    local tr = util.TraceLine({
+        start = bot:EyePos(),
+        endpos = obj:WorldSpaceCenter(),
+        filter = ignore,
+        mask = MASK_SHOT
+    })
+
+    if tr.Entity and tr.Entity:GetClass() == objClass then
+        return tr.HitPos
+    end
+
+    return nil
+end
+
+function LeadBot.IsTargetVisible(bot, target, ignore)
     if not IsValid(target) or not IsValid(bot) then return nil end
 
     -- Field of view check
@@ -243,6 +296,9 @@ end
 
 -- https://github.com/Necrossin/darkestdays/blob/master/entities/entities/effect_grenade/shared.lua#L96
 function LeadBot.ThrowNade(bot)
+    if not entityLoaded then return end
+    if not bot:Alive() then return end
+
     local wep = bot:GetActiveWeapon()
 	
 	if bot.IsCrow and bot:IsCrow() then return end
@@ -298,16 +354,16 @@ function LeadBot.ThrowNade(bot)
 end
 
 function LeadBot.StartCommand(bot, cmd)
+    local controller = bot.ControllerBot
+    if !IsValid(controller) then return end
+
     local buttons = 0
     local botWeapon = bot:GetActiveWeapon()
     local melee = IsValid(botWeapon) and botWeapon.Base == "dd_meleebase"
-    local controller = bot.ControllerBot
     local target = controller.Target
     local aboutToThrowNade = controller.NextNadeThrowTime < CurTime() and math.random(5) == 1 and not melee and not bot:IsThug()
 
-    if !IsValid(controller) then return end
-
-    -- Sprint when not casting spells
+    -- Sprint when not casting spells and not about to throw nade
     if controller.NextAttack2 < CurTime() and not aboutToThrowNade then
         buttons = buttons + IN_SPEED
     end
@@ -358,9 +414,9 @@ function LeadBot.StartCommand(bot, cmd)
                 end
 
                 -- Throw nade
-                if aboutToThrowNade then
-                    LeadBot.ThrowNade(bot)
+                if aboutToThrowNade and entityLoaded then
                     controller.NextNadeThrowTime = CurTime() + math.random(12, 20)
+                    LeadBot.ThrowNade(bot)
                 end
             end
         else
@@ -452,7 +508,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         end)
 
         for _, ply in ipairs(targets) do
-            visibleTargetPos = LeadBot.GetVisibleHitbox(bot, ply, {bot, controller})
+            visibleTargetPos = LeadBot.IsTargetVisible(bot, ply, {bot, controller})
             if visibleTargetPos then
                 controller.Target = ply
                 controller.ForgetTarget = CurTime() + 2
@@ -460,7 +516,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
             end
         end
     elseif controller.ForgetTarget > CurTime() then
-        visibleTargetPos = LeadBot.GetVisibleHitbox(bot, controller.Target, {bot, controller})
+        visibleTargetPos = LeadBot.IsTargetVisible(bot, controller.Target, {bot, controller})
         if visibleTargetPos then
             controller.ForgetTarget = CurTime() + 2
         end
@@ -538,7 +594,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         end
 
         if not visibleTargetPos then
-            visibleTargetPos = LeadBot.GetVisibleHitbox(bot, controller.Target, {bot, controller})
+            visibleTargetPos = LeadBot.IsTargetVisible(bot, controller.Target, {bot, controller})
         end
 
         if !melee and visibleTargetPos then
@@ -647,7 +703,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     mv:SetMoveAngles(mva)
 
     if not visibleTargetPos and IsValid(controller.Target) then
-        visibleTargetPos = LeadBot.GetVisibleHitbox(bot, controller.Target, {bot, controller})
+        visibleTargetPos = LeadBot.IsTargetVisible(bot, controller.Target, {bot, controller})
     end
 
     if IsValid(controller.Target) and visibleTargetPos then
@@ -717,11 +773,27 @@ hook.Add("PlayerSpawn", "LeadBot_Spawn", function(bot)
     end
 end)
 
+hook.Add("PlayerDeath", "LeadBot_Death", function(bot, inflictor, attacker)
+    if bot:IsBot() then
+        LeadBot.PlayerDeath(bot, inflictor, attacker)
+    end
+end)
+
+hook.Add("Initialize", "LeadBot_Init", function()
+    entityLoaded = false
+end)
+
+hook.Add("PreCleanupMap", "LeadBot_PreCleanupMap", function()
+    entityLoaded = false
+end)
+
 hook.Add("InitPostEntity", "LeadBot_PostEnt_Init", function()
+    entityLoaded = true
     LeadBot.Init()
 end)
 
 hook.Add("PostCleanupMap", "LeadBot_PostClean_Init", function()
+    entityLoaded = true
     LeadBot.Init()
 end)
 
