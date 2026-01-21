@@ -18,7 +18,7 @@ hook.Add("Think", "LeadBot_Quota", function()
         local max = convar1:GetInt() - #player.GetHumans()
 
         for _, ply in pairs(player.GetBots()) do
-            if ply:IsLBot(true) then
+            if ply:IsBot() then
                 table.insert(bots, ply)
             end
         end

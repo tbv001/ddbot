@@ -1,7 +1,5 @@
 include("leadbot/shared.lua")
 
---[[ CONFIGURATION ]]--
-
 local isTeamPlay = false
 local entityLoaded = false
 local difficulty = 0
@@ -9,7 +7,9 @@ local objective
 local gametype
 local door_enabled
 
---[[ COMMANDS ]]--
+--[[----------------------------
+    Commands & ConVars
+----------------------------]]--
 
 concommand.Add("leadbot_add", function(ply, _, args)
     if IsValid(ply) and not ply:IsSuperAdmin() then
@@ -45,12 +45,12 @@ concommand.Add("leadbot_kick", function(ply, _, args)
 end, nil, "Kicks LeadBots (all is avaliable!)")
 
 concommand.Add("leadbot_generatenavmesh", function(ply, _, args)
-    if not GetConVar("sv_cheats"):GetBool() then
-        MsgN("[LeadBot] sv_cheats must be enabled to generate a navmesh!")
+    if IsValid(ply) and not ply:IsSuperAdmin() then
         return
     end
 
-    if IsValid(ply) and not ply:IsSuperAdmin() then
+    if not GetConVar("sv_cheats"):GetBool() then
+        MsgN("[LeadBot] sv_cheats must be enabled to generate a navmesh!")
         return
     end
 
@@ -69,14 +69,16 @@ end, nil, "Generate a cheap navmesh")
 CreateConVar("leadbot_difficulty", "0", {FCVAR_ARCHIVE}, "Sets the LeadBot difficulty (0 = Easy, 1 = Medium, 2 = Hard)")
 
 
---[[ FUNCTIONS ]]--
+--[[----------------------------
+    Functions
+----------------------------]]--
 
 function LeadBot.AddBot()
     if not entityLoaded then
         return
     end
 
-    if !navmesh.IsLoaded() then
+    if not navmesh.IsLoaded() then
         MsgN("There is no navmesh! Generate one using \"leadbot_generatenavmesh\"!")
         return
     end
@@ -88,23 +90,17 @@ function LeadBot.AddBot()
 
     local name = "Bot #" .. #player.GetBots() + 1
     local model = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
-    local botcolor = ColorRand()
-    local botweaponcolor = ColorRand()
-    local color = Vector(botcolor.r / 255, botcolor.g / 255, botcolor.b / 255)
-    local weaponcolor = Vector(botweaponcolor.r / 255, botweaponcolor.g / 255, botweaponcolor.b / 255)
     local bot = player.CreateNextBot(name)
 
-    if !IsValid(bot) then
+    if not IsValid(bot) then
         MsgN("[LeadBot] Unable to create bot!")
         return
     end
 
-    bot.LeadBot_Config = {model, color, weaponcolor}
-
+    bot.ChosenPM = model
     bot.ControllerBot = ents.Create("leadbot_navigator")
     bot.ControllerBot:Spawn()
     bot.ControllerBot:SetOwner(bot)
-    bot.LeadBot = true
     LeadBot.AddBotOverride(bot)
     MsgN("[LeadBot] Bot " .. name .. " added!")
 end
@@ -133,7 +129,6 @@ function LeadBot.AddBotOverride(bot)
 end
 
 function LeadBot.PlayerSpawn(bot)
-    if !bot:IsBot() then return end
     if not (Spells and Perks and Builds and Weapons) then return end
 
     local primaries = {}
@@ -169,11 +164,9 @@ function LeadBot.PlayerSpawn(bot)
         bot.PerksToGive = {"none"}
     end
 
-    build.OnSet(bot)
-
     timer.Simple(0, function()
         if IsValid(bot) then
-            local model = string.lower(player_manager.TranslatePlayerModel(bot:LBGetModel()))
+            local model = string.lower(player_manager.TranslatePlayerModel(bot.ChosenPM))
             if table.HasValue(GAMEMODE.ModelBlacklist, model) then
                 model = "models/player/kleiner.mdl"
             end
@@ -181,6 +174,8 @@ function LeadBot.PlayerSpawn(bot)
             bot:SetModel(model)
             bot:SetDTString(0, model)
             bot:SetVoiceSet(VoiceSetTranslate[model] or "male")
+
+            build.OnSet(bot)
         end
     end)
 end
@@ -196,13 +191,13 @@ function LeadBot.Init()
 end
 
 function LeadBot.Think()
-    if !gametype then
+    if not gametype then
         LeadBot.Init()
     end
 
     for _, bot in player.Iterator() do
-        if bot:IsLBot() then
-            if bot.NextSpawnTime and !bot:Alive() and bot.NextSpawnTime < CurTime() then
+        if bot:IsBot() then
+            if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < CurTime() then
                 bot:Spawn()
                 return
             end
@@ -217,8 +212,6 @@ function LeadBot.Think()
 end
 
 function LeadBot.PlayerDeath(bot, inflictor, attacker)
-    if not bot:IsBot() then return end
-
     for _, ent in ents.Iterator() do
         if IsValid(ent) and ent:GetClass() == "npc_grenade_frag" and ent:GetSaveTable().m_hThrower == bot then
             ent:Remove()
@@ -243,7 +236,11 @@ function LeadBot.PlayerHurt(ply, att, hp, dmg)
         return
     end
 
-    local controller = ply:GetController()
+    local controller = ply.ControllerBot
+
+    if not controller then
+        return
+    end
 
     if not IsValid(controller.Target) then
         controller.Target = att
@@ -388,7 +385,7 @@ end
 
 function LeadBot.StartCommand(bot, cmd)
     local controller = bot.ControllerBot
-    if !IsValid(controller) then return end
+    if not IsValid(controller) then return end
 
     local buttons = 0
     local botWeapon = bot:GetActiveWeapon()
@@ -412,7 +409,7 @@ function LeadBot.StartCommand(bot, cmd)
     end
 
     if IsValid(botWeapon) then
-        if not melee and botWeapon:GetMaxClip1() > 0 and (botWeapon:Clip1() == 0 or !IsValid(target) and botWeapon:Clip1() <= botWeapon:GetMaxClip1() / 2) then
+        if not melee and botWeapon:GetMaxClip1() > 0 and (botWeapon:Clip1() == 0 or not IsValid(target) and botWeapon:Clip1() <= botWeapon:GetMaxClip1() / 2) then
             buttons = buttons + IN_RELOAD
         end
 
@@ -484,7 +481,7 @@ function LeadBot.StartCommand(bot, cmd)
         buttons = buttons + IN_JUMP
     end
 
-    if !bot:IsOnGround() and controller.NextJump > CurTime() then
+    if not bot:IsOnGround() and controller.NextJump > CurTime() then
         buttons = buttons + IN_DUCK
     end
 
@@ -499,7 +496,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     local inobjective = false
     local visibleTargetPos
 
-    if !IsValid(controller) then
+    if not IsValid(controller) then
         bot.ControllerBot = ents.Create("leadbot_navigator")
         bot.ControllerBot:Spawn()
         bot.ControllerBot:SetOwner(bot)
@@ -521,7 +518,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     local zombies = gametype == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
 
-    if ((bot.NextSpawnTime and bot.NextSpawnTime + 1 > CurTime()) or !IsValid(controller.Target) or controller.ForgetTarget < CurTime() or !controller.Target:Alive()) then
+    if ((bot.NextSpawnTime and bot.NextSpawnTime + 1 > CurTime()) or not IsValid(controller.Target) or controller.ForgetTarget < CurTime() or not controller.Target:Alive()) then
         controller.Target = nil
     end
 
@@ -530,7 +527,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         local botPos = bot:GetPos()
 
         for _, ply in player.Iterator() do
-            if ply ~= bot and ((ply:IsPlayer() and (!isTeamPlay or (isTeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(botPos) < 2250000 then
+            if ply ~= bot and ((ply:IsPlayer() and (not isTeamPlay or (isTeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(botPos) < 2250000 then
                 if ply:Alive() then
                     table.insert(targets, ply)
                 end
@@ -578,7 +575,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
                 controller.PosGen = LeadBot.FindRandomSpot(bot)
                 controller.LastSegmented = CurTime() + 8
             else
-                if !IsValid(objective) then
+                if not IsValid(objective) then
                     objective = ents.FindByClass("htf_flag")[1]
                 end
 
@@ -586,7 +583,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
                 if IsValid(flag) then
                     local rand = 64
 
-                    if !IsValid(flag:GetCarrier()) then
+                    if not IsValid(flag:GetCarrier()) then
                         rand = 32
                     end
 
@@ -596,7 +593,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
                 end
             end
         elseif gametype == "koth" then
-            if !IsValid(objective) then
+            if not IsValid(objective) then
                 objective = ents.FindByClass("koth_point")[1]
             end
 
@@ -622,7 +619,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         local distance = controller.Target:GetPos():DistToSqr(bot:GetPos())
 
         -- Move to our target
-        if !bot:IsCarryingFlag() and (not melee and not inobjective or melee) then
+        if not bot:IsCarryingFlag() and (not melee and not inobjective or melee) then
             controller.PosGen = controller.Target:GetPos()
             controller.LastSegmented = CurTime() + ((melee and math.Rand(0.7, 0.9)) or math.Rand(1.1, 1.3))
         end
@@ -631,7 +628,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
             visibleTargetPos = LeadBot.IsTargetVisible(bot, controller.Target, {bot, controller})
         end
 
-        if !melee and visibleTargetPos then
+        if not melee and visibleTargetPos then
             -- Back up if the target is really close
             if distance <= 40000 then
                 mv:SetForwardSpeed(-maxSpeed)
@@ -659,19 +656,19 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         end
     end
 
-    if !controller.P then
+    if not controller.P then
         return
     end
 
     local segments = controller.P:GetAllSegments()
 
-    if !segments then return end
+    if not segments then return end
 
     local cur_segment = controller.cur_segment
     local curgoal = segments[cur_segment]
 
     -- Got nowhere to go, why keep moving?
-    if !curgoal then
+    if not curgoal then
         mv:SetForwardSpeed(0)
         return
     end
@@ -685,12 +682,12 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     local goalpos = curgoal.pos
 
     -- Stuck logic
-    if bot:GetVelocity():Length2DSqr() <= 225 and (gametype ~= "koth" or !inobjective) then
+    if bot:GetVelocity():Length2DSqr() <= 225 and (gametype ~= "koth" or not inobjective) then
         if controller.NextCenter < CurTime() then
             controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
             controller.NextCenter = CurTime() + math.Rand(0.3, 0.65)
         elseif controller.nextStuckJump < CurTime() then
-            if !bot:Crouching() then
+            if not bot:Crouching() then
                 controller.NextJump = 0
             end
             controller.nextStuckJump = CurTime() + math.Rand(1, 2)
@@ -763,13 +760,19 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     end
 end
 
--- [[ CONVAR CHANGE CALLBACKS ]]--
+
+--[[----------------------------
+    ConVar Change Callbacks
+----------------------------]]--
+
 cvars.AddChangeCallback("leadbot_difficulty", function(convar_name, value_old, value_new)
     difficulty = math.Clamp(tonumber(value_new) or 0, 0, 2)
 end)
 
 
---[[ HOOKS ]]--
+--[[----------------------------
+    Hooks
+----------------------------]]--
 
 hook.Add("PlayerDisconnected", "LeadBot_Disconnect", function(bot)
     if IsValid(bot.ControllerBot) then
@@ -778,13 +781,13 @@ hook.Add("PlayerDisconnected", "LeadBot_Disconnect", function(bot)
 end)
 
 hook.Add("SetupMove", "LeadBot_Control", function(bot, mv, cmd)
-    if bot:IsLBot() then
+    if bot:IsBot() then
         LeadBot.PlayerMove(bot, cmd, mv)
     end
 end)
 
 hook.Add("StartCommand", "LeadBot_Control", function(bot, cmd)
-    if bot:IsLBot() then
+    if bot:IsBot() then
         LeadBot.StartCommand(bot, cmd)
     end
 end)
@@ -804,7 +807,7 @@ hook.Add("Think", "LeadBot_Think", function()
 end)
 
 hook.Add("PlayerSpawn", "LeadBot_Spawn", function(bot)
-    if bot:IsLBot() then
+    if bot:IsBot() then
         LeadBot.PlayerSpawn(bot)
     end
 end)
@@ -834,59 +837,3 @@ hook.Add("PostCleanupMap", "LeadBot_PostClean_Init", function()
 end)
 
 hook.Add("CalcMainActivity", "LeadBot_ActivityServer", CalcMainActivityBots)
-
-
---[[ META ]]--
-
-local player_meta = FindMetaTable("Player")
-local oldInfo = player_meta.GetInfo
-
-function player_meta.IsLBot(self, realbotsonly)
-    if realbotsonly == true then
-        return self.LeadBot and self:IsBot() or false
-    end
-
-    return self.LeadBot or false
-end
-
-function player_meta.LBGetModel(self)
-    if self.LeadBot_Config then
-        return self.LeadBot_Config[1]
-    else
-        return "kleiner"
-    end
-end
-
-function player_meta.LBGetColor(self, weapon)
-    if self.LeadBot_Config then
-        if weapon == true then
-            return self.LeadBot_Config[3]
-        else
-            return self.LeadBot_Config[2]
-        end
-    else
-        return Vector(0, 0, 0)
-    end
-end
-
-function player_meta.GetInfo(self, convar)
-    if self:IsBot() and self:IsLBot() then
-        if convar == "cl_playermodel" then
-            return self:LBGetModel()
-        elseif convar == "cl_playercolor" then
-            return self:LBGetColor()
-        elseif convar == "cl_weaponcolor" then
-            return self:LBGetColor(true)
-        else
-            return ""
-        end
-    else
-        return oldInfo(self, convar)
-    end
-end
-
-function player_meta.GetController(self)
-    if self:IsLBot() then
-        return self.ControllerBot
-    end
-end
