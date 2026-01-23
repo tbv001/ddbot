@@ -29,4 +29,4 @@ git clone https://github.com/tbv001/ddbot.git
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/tbv001/ddbot/blob/master/LICENSE) file for details.
+This project is licensed under the **MIT License** - see the [LICENSE](https://github.com/tbv001/ddbot/blob/master/LICENSE) file for details.
