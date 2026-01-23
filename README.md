@@ -1,12 +1,12 @@
 # Darkest Days Bots
 
-An addon for Garry's Mod that aims to provide challenging and life-like AI opponents for the Darkest Days gamemode. Originally a LeadBot fork, but after heavy refactoring and customisation, it has become a standalone project.
+An addon for Garry's Mod that aims to provide challenging and life-like AI opponents for the Darkest Days game mode. Originally a LeadBot fork, after heavy refactoring and customisation, it has become a standalone project.
 
 ## Installation
 
 Navigate to your Garry's Mod addons folder, and then clone the repository:
 ```bash
-git clone https://github.com/tbv001/leadbot_dd.git
+git clone https://github.com/tbv001/ddbot.git
 ```
 
 ## Commands
@@ -29,4 +29,4 @@ git clone https://github.com/tbv001/leadbot_dd.git
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/tbv001/leadbot_dd/blob/master/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/tbv001/ddbot/blob/master/LICENSE) file for details.
