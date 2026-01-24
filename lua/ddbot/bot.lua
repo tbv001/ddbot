@@ -196,6 +196,10 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         return nil
     end
 
+    if target.IsGhosting and target:IsGhosting() then
+        return nil
+    end
+
     -- For props
     if not target:IsPlayer() then
         local tr = util.TraceLine({
@@ -748,7 +752,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local zombies = gameType == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
 
-    if ((bot.NextSpawnTime and bot.NextSpawnTime + 1 > CurTime()) or not IsValid(controller.Target) or controller.ForgetTarget < CurTime() or not controller.Target:Alive()) then
+    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > CurTime()) or not IsValid(controller.Target) or controller.ForgetTarget < CurTime() or not controller.Target:Alive() or (controller.Target.IsGhosting and controller.Target:IsGhosting()) then
         controller.Target = nil
     end
 
@@ -785,7 +789,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
     -- Break props and func_breakables
     if not IsValid(controller.Target) and controller.NextPropCheck < CurTime() then
         controller.NextPropCheck = CurTime() + 0.1
-        local propsInRadius = ents.FindInSphere(botPos, 100)
+        local radiusCheck = melee and 50 or 100
+        local propsInRadius = ents.FindInSphere(botPos, radiusCheck)
         local closestDist = math.huge
         local closestProp
 
