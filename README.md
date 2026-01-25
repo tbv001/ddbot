@@ -20,6 +20,7 @@ git clone https://github.com/tbv001/ddbot.git
 - dd_bot_combat_movement [0/1]: Enables or disables combat movement for bots.
 - dd_bot_use_grenades [0/1]: Enables or disables grenade usage for bots.
 - dd_bot_use_spells [0/1]: Enables or disables spell usage for bots.
+- dd_bot_aim_prediction [0/1]: Enables or disables aim prediction for bots.
 - dd_bot_quota [0-128]: Sets the bot quota.
 
 ## Credits
