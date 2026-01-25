@@ -17,6 +17,7 @@ local cv_DiveEnabled = true
 local cv_CombatMovementEnabled = true
 local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
+local cv_AimPredictionEnabled = true
 
 
 --[[----------------------------
@@ -95,6 +96,7 @@ local cv_CombatMovement = CreateConVar("dd_bot_combat_movement", "1", {FCVAR_ARC
 local cv_CanUseGrenades = CreateConVar("dd_bot_use_grenades", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use grenades")
 local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use spells")
 local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bot quota")
+local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
 
 
 --[[----------------------------
@@ -365,6 +367,20 @@ function DDBot.GetClosestEnemy(bot)
     return closestEnemy
 end
 
+function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetAimPos)
+    if not IsValid(target) then return nil end
+    
+    local targetPos = targetAimPos or target:WorldSpaceCenter()
+    local targetVel = target:GetVelocity()
+    local dist = shootPos:Distance(targetPos)
+    
+    -- t = d / v
+    local timeToHit = dist / projectileSpeed
+    
+    -- x = x + v * t
+    return targetPos + (targetVel * timeToHit)
+end
+
 function DDBot.FindRandomSpot(bot)
     if not IsValid(bot) then return end
 
@@ -522,6 +538,7 @@ function DDBot.Think()
         cv_CombatMovementEnabled = cv_CombatMovement:GetBool()
         cv_CanUseGrenadesEnabled = cv_CanUseGrenades:GetBool()
         cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
+        cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
     end
 
     for _, bot in player.Iterator() do
@@ -1066,6 +1083,22 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         local aimAtPos = visibleTargetPos or controller.Target:WorldSpaceCenter()
+        
+        if IsValid(wep) and cv_AimPredictionEnabled then
+            local class = wep:GetClass()
+            
+            if class == "dd_xbow" then
+                local predictedPos = DDBot.CalculateAimPrediction(3000, bot:GetShootPos(), controller.Target, aimAtPos)
+                if predictedPos then
+                    aimAtPos = predictedPos
+                end
+            elseif class == "dd_launcher" then
+                local predictedPos = DDBot.CalculateAimPrediction(1000, bot:GetShootPos(), controller.Target, bot:VisibleVec(controller.Target:GetPos()) and controller.Target:GetPos() or aimAtPos)
+                if predictedPos then
+                    aimAtPos = predictedPos
+                end
+            end
+        end
 
         bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, (aimAtPos - bot:GetShootPos()):Angle()))
     else
