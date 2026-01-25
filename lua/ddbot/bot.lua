@@ -176,7 +176,7 @@ function DDBot.AddBotOverride(bot)
     bot:KillSilent()
     bot:SetDeaths(0)
     bot:SetTeamColor()
-    bot.NextSpawnTime = CurTime() + GetConVar("dd_options_spawn_time"):GetInt()
+    bot.NextSpawnTime = CurTime() + math.random(2, 6)
 end
 
 function DDBot.IsPosWithinFOV(bot, fov, pos)
@@ -633,7 +633,7 @@ function DDBot.StartCommand(bot, cmd)
     local isTargetValid = IsValid(target)
     local isTargetVisible = isTargetValid and DDBot.IsTargetVisible(bot, target, {bot, controller})
     local isThug = bot:IsThug()
-    local aboutToThrowNade = cv_CanUseGrenadesEnabled and isTargetVisible and controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
+    local aboutToThrowNade = cv_CanUseGrenadesEnabled and (bot.Skills.agility and bot.Skills.agility == 15) and isTargetVisible and controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
     local isAlreadyAttacking = false
     local isSliding = false
 
@@ -752,6 +752,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local controller = bot.ControllerBot
     local maxSpeed = 999999
     local inobjective = false
+    local reachedDest = false
     local visibleTargetPos
 
     if not IsValid(controller) then
@@ -991,9 +992,14 @@ function DDBot.PlayerMove(bot, cmd, mv)
         return
     end
 
+    if botPos:DistToSqr(controller.PosGen) < 900 then
+        mv:SetForwardSpeed(0)
+        reachedDest = true
+    end
+
     -- Think every step of the way!
     local cPos = curgoal.pos
-    local distSqr = (botPos.x - cPos.x) ^ 2 + (botPos.y - cPos.y) ^ 2
+    local distSqr = botPos:DistToSqr(cPos)
 
     if segments[cur_segment + 1] and distSqr < 100 then
         controller.cur_segment = controller.cur_segment + 1
@@ -1008,7 +1014,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     -- Stuck logic
-    if bot:GetVelocity():Length2DSqr() <= 225 and (not isKothMode or not inobjective) then
+    if bot:GetVelocity():Length2DSqr() <= 225 and (not isKothMode or not inobjective) and not reachedDest then
         if controller.NextCenter < curTime then
             controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
             controller.NextCenter = curTime + math.Rand(0.3, 0.65)
