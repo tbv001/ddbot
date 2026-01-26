@@ -44,6 +44,7 @@ local cachedSpells, cachedPerks, cachedBuilds
 local sortRefPos
 local cv_QuotaVal = 0
 local cv_AimSpeedMult = 1
+local cv_FOVVal = 100
 local cv_SlideEnabled = true
 local cv_DiveEnabled = true
 local cv_CombatMovementEnabled = true
@@ -130,6 +131,7 @@ local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", {FCVAR_ARCHIVE}, 
 local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bot quota")
 local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
 local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
+local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
 
 
 --[[----------------------------
@@ -149,6 +151,7 @@ function DDBot.Init()
     cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
     cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
     cv_AimSpreadMult = cv_AimSpreadMult:GetFloat()
+    cv_FOV = cv_FOV:GetInt()
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -210,7 +213,7 @@ function DDBot.AddBotOverride(bot)
     bot.NextSpawnTime = CurTime() + math.random(2, 6)
 end
 
-function DDBot.IsPosWithinFOV(bot, fov, pos)
+function DDBot.IsPosWithinFOV(bot, pos)
     local bPos = bot:GetPos()
     local diffX = pos.x - bPos.x
     local diffY = pos.y - bPos.y
@@ -221,7 +224,7 @@ function DDBot.IsPosWithinFOV(bot, fov, pos)
 
     local aimVec = bot:GetAimVector()
     local dot = aimVec.x * diffX + aimVec.y * diffY + aimVec.z * diffZ
-    local cosVal = math.cos(math.rad(fov))
+    local cosVal = math.cos(math.rad(cv_FOVVal / 2))
 
     return dot >= 0 and dot * dot >= cosVal * cosVal * distSqr
 end
@@ -232,7 +235,7 @@ function DDBot.IsTargetVisible(bot, target, ignore)
     local targetCenter = target:WorldSpaceCenter()
 
     -- Field of view check
-    if not DDBot.IsPosWithinFOV(bot, 100, targetCenter) then
+    if not DDBot.IsPosWithinFOV(bot, targetCenter) then
         return nil
     end
 
@@ -479,10 +482,10 @@ function DDBot.IsDirClear(bot, dir)
     local tr = util.TraceHull({
         start = center,
         endpos = center + dir * 50,
-        mins = Vector(-13, -13, 13),
+        mins = Vector(-13, -13, -13),
         maxs = Vector(13, 13, 13),
         filter = {bot, controller},
-        mask = MASK_SOLID
+        mask = MASK_PLAYERSOLID
     })
     return not tr.Hit
 end
@@ -747,7 +750,7 @@ function DDBot.StartCommand(bot, cmd)
             end
 
             local targetCenter = target:WorldSpaceCenter()
-            if DDBot.IsPosWithinFOV(bot, 100, targetCenter) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and isTargetVisible then
+            if DDBot.IsPosWithinFOV(bot, targetCenter) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and isTargetVisible then
                 local inMeleeRange = not melee or bot:GetPos():DistToSqr(target:GetPos()) < 10000
                 if inMeleeRange then
                     local attack2 = (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime) and IN_ATTACK2 or 0
@@ -1248,6 +1251,10 @@ end)
 
 cvars.AddChangeCallback("dd_bot_aim_spread_mult", function(convar_name, value_old, value_new)
     cv_AimSpreadMult = tonumber(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_fov", function(convar_name, value_old, value_new)
+    cv_FOVVal = tonumber(value_new)
 end)
 
 --[[----------------------------
