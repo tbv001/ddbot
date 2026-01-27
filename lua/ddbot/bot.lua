@@ -789,13 +789,7 @@ function DDBot.StartCommand(bot, cmd)
     end
 
     if bot:GetMoveType() == MOVETYPE_LADDER then
-        if controller.NextLadderJump < curTime then
-            buttons = buttons + IN_JUMP
-        end
-
-        buttons = buttons + IN_FORWARD
-    else
-        controller.NextLadderJump = curTime + 10
+        controller.NextJump = 0
     end
 
     if not isSliding then
@@ -1135,7 +1129,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     -- Jump
-    if controller.NextJump ~= 0 and curgoal.type >= 1 and controller.NextJump < curTime then
+    if controller.NextJump ~= 0 and curgoal.type > 0 and controller.NextJump < curTime then
         controller.NextJump = 0
     end
 

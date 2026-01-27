@@ -30,7 +30,6 @@ function ENT:Initialize()
 	self.NextAttack2 = 0
 	self.NextAttack2Delay = 0
 	self.NextChangeSpell = 0
-	self.NextLadderJump = 0
 	self.NextDiveTime = 0
 	self.ShootReactionTime = 0
 	self.NextSlideTime = 0
