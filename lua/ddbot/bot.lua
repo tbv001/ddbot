@@ -1,3 +1,35 @@
+local include = include
+local concommand = concommand
+local IsValid = IsValid
+local pairs = pairs
+local player = player
+local string = string
+local GetConVar = GetConVar
+local MsgN = MsgN
+local navmesh = navmesh
+local CreateConVar = CreateConVar
+local ents = ents
+local game = game
+local player_manager = player_manager
+local table = table
+local tostring = tostring
+local CurTime = CurTime
+local math = math
+local util = util
+local team = team
+local Color = Color
+local Vector = Vector
+local ipairs = ipairs
+local timer = timer
+local tonumber = tonumber
+local VectorRand = VectorRand
+local FrameTime = FrameTime
+local Angle = Angle
+local LerpAngle = LerpAngle
+local cvars = cvars
+local tobool = tobool
+local hook = hook
+
 include("ddbot/shared.lua")
 
 local DDBot = {}
