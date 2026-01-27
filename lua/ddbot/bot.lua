@@ -1,35 +1,3 @@
-local include = include
-local concommand = concommand
-local IsValid = IsValid
-local pairs = pairs
-local player = player
-local string = string
-local GetConVar = GetConVar
-local MsgN = MsgN
-local navmesh = navmesh
-local CreateConVar = CreateConVar
-local ents = ents
-local game = game
-local player_manager = player_manager
-local table = table
-local tostring = tostring
-local CurTime = CurTime
-local math = math
-local util = util
-local team = team
-local Color = Color
-local Vector = Vector
-local ipairs = ipairs
-local timer = timer
-local tonumber = tonumber
-local VectorRand = VectorRand
-local FrameTime = FrameTime
-local Angle = Angle
-local LerpAngle = LerpAngle
-local cvars = cvars
-local tobool = tobool
-local hook = hook
-
 include("ddbot/shared.lua")
 
 local DDBot = {}
@@ -43,7 +11,7 @@ local cachedPrimaries, cachedSecondaries
 local cachedSpells, cachedPerks, cachedBuilds
 local sortRefPos
 local cv_QuotaVal = 0
-local cv_AimSpeedMult = 1
+local cv_AimSpeedMultVal = 1
 local cv_FOVVal = 100
 local cv_SlideEnabled = true
 local cv_DiveEnabled = true
@@ -143,7 +111,7 @@ function DDBot.Init()
     gameType = GAMEMODE:GetGametype()
     
     cv_QuotaVal = cv_Quota:GetInt()
-    cv_AimSpeedMult = cv_AimSpeedMult:GetFloat()
+    cv_AimSpeedMultVal = cv_AimSpeedMult:GetFloat()
     cv_SlideEnabled = cv_Slide:GetBool()
     cv_DiveEnabled = cv_Dive:GetBool()
     cv_CombatMovementEnabled = cv_CombatMovement:GetBool()
@@ -151,7 +119,7 @@ function DDBot.Init()
     cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
     cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
     cv_AimSpreadMult = cv_AimSpreadMult:GetFloat()
-    cv_FOV = cv_FOV:GetInt()
+    cv_FOVVal = cv_FOV:GetInt()
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -343,7 +311,7 @@ function DDBot.ThrowNade(bot)
 		ent:SetModelScale( 1.5, 0 )
 
 		local phys = ent:GetPhysicsObject()
-		if phys:IsValid() then
+		if IsValid(phys) then
 			phys:Wake()
 			phys:SetVelocity(bot:GetVelocity()+bot:GetAimVector() * 900)
 			phys:AddAngleVelocity(Vector(600,math.random(-1200,1200),0))
@@ -416,7 +384,12 @@ function DDBot.FindRandomSpot(bot)
     if not IsValid(bot) then return end
 
     local randomPosList = navmesh.Find(bot:GetPos(), 12500, 18, 128)
-    local pos = randomPosList[math.random(1, #randomPosList)]:GetRandomPoint()
+    if not randomPosList or #randomPosList == 0 then
+        return bot:GetPos()
+    end
+    
+    local randomNav = randomPosList[math.random(1, #randomPosList)]
+    local pos = randomNav and randomNav:GetRandomPoint()
 
     return pos or bot:GetPos()
 end
@@ -516,13 +489,22 @@ function DDBot.PlayerSpawn(bot)
     end
     
     if not cachedSpells then
-        cachedSpells = table.GetKeys(Spells)
-        cachedPerks = table.GetKeys(Perks)
-        for i, perk in ipairs(cachedPerks) do
-            if perk == "thug" or perk == "crow" or perk == "blank" then
-                cachedPerks[i] = nil
+        local tempSpells = table.GetKeys(Spells)
+        cachedSpells = {}
+        for _, spell in ipairs(tempSpells) do
+            if spell ~= "cure" then
+                cachedSpells[#cachedSpells + 1] = spell
             end
         end
+
+        local tempPerks = table.GetKeys(Perks)
+        cachedPerks = {}
+        for _, perk in ipairs(tempPerks) do
+            if perk ~= "thug" and perk ~= "crow" and perk ~= "blank" then
+                cachedPerks[#cachedPerks + 1] = perk
+            end
+        end
+
         cachedBuilds = table.GetKeys(Builds)
     end
     
@@ -1143,7 +1125,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     -- Eyesight
     local ft = FrameTime()
-    local lerp = ft * 8 * cv_AimSpeedMult
+    local lerp = ft * 8 * cv_AimSpeedMultVal
     local lerpc = ft * 8
 
     local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
@@ -1218,7 +1200,7 @@ cvars.AddChangeCallback("dd_bot_quota", function(convar_name, value_old, value_n
 end)
 
 cvars.AddChangeCallback("dd_bot_aim_speed_mult", function(convar_name, value_old, value_new)
-    cv_AimSpeedMult = tonumber(value_new)
+    cv_AimSpeedMultVal = tonumber(value_new)
 end)
 
 cvars.AddChangeCallback("dd_bot_slide", function(convar_name, value_old, value_new)
