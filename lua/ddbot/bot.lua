@@ -1032,19 +1032,16 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 local rightDir = bot:GetRight()
                 local leftDir = -rightDir
 
-                if DDBot.IsDirClear(bot, backDir) then
-                    backingUp = true
-                    mv:SetForwardSpeed(-maxSpeed)
-                elseif DDBot.IsDirClear(bot, leftDir) then
-                    backingUp = true
-                    mv:SetSideSpeed(-maxSpeed)
-                elseif DDBot.IsDirClear(bot, rightDir) then
-                    backingUp = true
-                    mv:SetSideSpeed(maxSpeed)
-                else
-                    backingUp = true
-                    mv:SetForwardSpeed(-maxSpeed)
+                if not DDBot.IsDirClear(bot, backDir) then
+                    if DDBot.IsDirClear(bot, leftDir) then
+                        mv:SetSideSpeed(-maxSpeed)
+                    elseif DDBot.IsDirClear(bot, rightDir) then
+                        mv:SetSideSpeed(maxSpeed)
+                    end
                 end
+
+                backingUp = true
+                mv:SetForwardSpeed(-maxSpeed)
             end
 
             -- Combat movement (strafing, jumping)
