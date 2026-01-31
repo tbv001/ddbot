@@ -461,7 +461,7 @@ function DDBot.GiveSupport(ply, target)
             end
 
             if isVisible then
-                controller.LookAt = (targetCenter - bot:GetShootPos()):Angle()
+                controller.LookAt = targetCenter
                 controller.LookAtTime = curTime + 1
             end
         end
@@ -676,16 +676,16 @@ function DDBot.PlayerHurt(ply, att, hp, dmg)
         if not IsValid(target) then
             controller.Target = att
             controller.ForgetTarget = curTime + 2
-            controller.LookAt = (attCenter - plyShootPos):Angle()
+            controller.LookAt = attCenter
             controller.LookAtTime = curTime + 1
         else
             if target == att then
-                controller.LookAt = (attCenter - plyShootPos):Angle()
+                controller.LookAt = attCenter
                 controller.LookAtTime = curTime + 1
             elseif controllerPos:DistToSqr(target:GetPos()) > controllerPos:DistToSqr(att:GetPos()) then
                 controller.Target = att
                 controller.ForgetTarget = curTime + 2
-                controller.LookAt = (attCenter - plyShootPos):Angle()
+                controller.LookAt = attCenter
                 controller.LookAtTime = curTime + 1
             end
         end
@@ -915,7 +915,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         if closestProp and DDBot.IsTargetVisible(bot, closestProp, {bot, controller}) then
-            controller.LookAt = (closestProp:WorldSpaceCenter() - bot:GetShootPos()):Angle()
+            controller.LookAt = closestProp:WorldSpaceCenter()
             controller.LookAtTime = curTime + 0.1
             controller.ForceShoot = true
         else
@@ -1166,14 +1166,15 @@ function DDBot.PlayerMove(bot, cmd, mv)
         visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
     end
 
+    local lookAtAngle
+    local botShootPos = bot:GetShootPos()
     if IsValid(controller.Target) and (melee and visibleTargetPos or not melee) then
         if isKothMode and inobjective and not melee then
             mv:SetForwardSpeed(0)
         end
 
         local aimAtPos = visibleTargetPos or controller.Target:WorldSpaceCenter()
-        local botShootPos = bot:GetShootPos()
-        
+
         local wepValid = IsValid(wep)
         if wepValid and cv_AimPredictionEnabled then
             local class = wep:GetClass()
@@ -1205,13 +1206,17 @@ function DDBot.PlayerMove(bot, cmd, mv)
             mv:SetForwardSpeed(0)
 
             if controller.LookAtTime < curTime then
-                controller.LookAt = Angle(math.random(-40, 40), math.random(-180, 180), 0)
+                controller.LookAt = bot:EyePos() + VectorRand() * 100
                 controller.LookAtTime = curTime + math.Rand(0.9, 1.3)
             end
         end
 
         if controller.LookAtTime > curTime then
-            local ang = LerpAngle(lerpc, botEyeAngles, controller.LookAt)
+            lookAtAngle = (controller.LookAt - botShootPos):Angle()
+        end
+
+        if lookAtAngle then
+            local ang = LerpAngle(lerpc, botEyeAngles, lookAtAngle)
             bot:SetEyeAngles(Angle(ang.p, ang.y, 0))
         else
             local ang = LerpAngle(lerpc, botEyeAngles, mva)
