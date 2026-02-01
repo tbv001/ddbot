@@ -522,7 +522,7 @@ function DDBot.PlayerSpawn(bot)
         local tempSpells = table.GetKeys(Spells)
         cachedSpells = {}
         for _, spell in ipairs(tempSpells) do
-            if spell ~= "cure" then
+            if spell ~= "cure" and spell ~= "barrier" then
                 cachedSpells[#cachedSpells + 1] = spell
             end
         end
