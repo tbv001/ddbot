@@ -395,8 +395,7 @@ function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetA
     
     local targetPos = targetAimPos or target:WorldSpaceCenter()
     local targetVel = target:GetVelocity()
-    local distSqr = shootPos:DistToSqr(targetPos)
-    local dist = distSqr > 0 and math.sqrt(distSqr) or 0
+    local dist = shootPos:Distance(targetPos)
     local timeToHit = dist / projectileSpeed
     
     return targetPos + (targetVel * timeToHit)
