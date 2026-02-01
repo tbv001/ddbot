@@ -256,19 +256,6 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         return tr.Entity == target and targetCenter or nil
     end
 
-    -- Check eye position first for optimization
-    local eyePos = target:EyePos()
-    local trData = {
-        start = botEyePos,
-        endpos = eyePos,
-        filter = ignore,
-        mask = MASK_SHOT
-    }
-    local tr = util.TraceLine(trData)
-    if tr.Entity == target then
-        return eyePos
-    end
-
     local count = target:GetHitBoxCount(0)
     if not count or count == 0 then
         return nil
@@ -280,10 +267,14 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         if bone then
             local pos = target:GetBonePosition(bone)
             if pos then
-                trData.endpos = pos
-                tr = util.TraceLine(trData)
+                local tr = util.TraceLine({
+                    start = botEyePos,
+                    endpos = pos,
+                    filter = ignore,
+                    mask = MASK_VISIBLE
+                })
 
-                if tr.Entity == target then
+                if not tr.Hit then
                     return pos
                 end
             end
