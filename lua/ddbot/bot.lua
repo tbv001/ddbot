@@ -868,6 +868,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     for _, ply in player.Iterator() do
         if ply ~= bot and ply:Alive() then
             local isEnemy = not isTeamPlay or ply:Team() ~= botTeam
+
             if isEnemy and ply:GetPos():DistToSqr(botPos) < 2250000 then
                 targets[#targets + 1] = ply
             end
@@ -883,7 +884,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     for i = 1, targetCount do
         local ply = targets[i]
         local isTargetVisible = DDBot.IsTargetVisible(bot, ply, {bot, controller})
-        if isTargetVisible then
+        if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or botPos:DistToSqr(controller.Target:GetPos()) > botPos:DistToSqr(ply:GetPos())) then
             controller.Target = ply
             controller.ForgetTarget = curTime + 2
             controller.ForceShoot = false

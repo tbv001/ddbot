@@ -21,7 +21,6 @@ function ENT:Initialize()
 	self.NextDuck = 0
 	self.cur_segment = 2
 	self.Target = nil
-	self.CurTargetPos = nil
 	self.LastSegmented = 0
 	self.ForgetTarget = 0
 	self.NextCenter = 0
