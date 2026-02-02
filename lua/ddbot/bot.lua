@@ -1090,7 +1090,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 end
             end
 
-            if controller.CombatStrafeDir ~= 0 and not melee then
+            if controller.CombatStrafeDir ~= 0 and not melee and not backingUp then
                 mv:SetSideSpeed(controller.CombatStrafeDir * maxSpeed)
             end
         end
