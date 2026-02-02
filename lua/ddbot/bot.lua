@@ -468,43 +468,46 @@ end
 
 function DDBot.IsDirClear(bot, dir)
     if not IsValid(bot) then
-        return false
+        return 0
     end
 
     local controller = bot.ControllerBot
     if not IsValid(controller) then
-        return false
+        return 0
     end
 
+    local dirRange = 100
     local center = bot:WorldSpaceCenter()
-    local endPos = center + dir * 100
+    local endPos = center + dir * dirRange
     local tr = util.TraceHull({
         start = center,
         endpos = endPos,
         mins = Vector(-13, -13, -13),
         maxs = Vector(13, 13, 13),
         filter = {bot, controller},
-        mask = MASK_PLAYERSOLID
+        mask = MASK_PLAYERSOLID_BRUSHONLY
     })
 
-    if tr.Hit then
-        return false
+    local clearDist = dirRange * tr.Fraction
+
+    if clearDist < 20 then
+        return 0
     end
 
     local botPos = bot:GetPos()
-    local checkPos = botPos + dir * 75
+    local checkPos = botPos + dir * clearDist
     local groundTrace = util.TraceLine({
         start = checkPos,
-        endpos = checkPos - Vector(0, 0, 18),
+        endpos = checkPos - Vector(0, 0, 44),
         filter = {bot, controller},
-        mask = MASK_PLAYERSOLID
+        mask = MASK_PLAYERSOLID_BRUSHONLY
     })
 
     if not groundTrace.StartSolid and not groundTrace.Hit then
-        return false
+        return 0
     end
 
-    return true
+    return clearDist
 end
 
 
@@ -869,9 +872,12 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local inobjective = false
     local reachedDest = false
     local backingUp = false
-    local backIsClear = DDBot.IsDirClear(bot, -bot:GetForward())
-    local rightIsClear = DDBot.IsDirClear(bot, bot:GetRight())
-    local leftIsClear = DDBot.IsDirClear(bot, -bot:GetRight())
+    local backClearDist = DDBot.IsDirClear(bot, -bot:GetForward())
+    local rightClearDist = DDBot.IsDirClear(bot, bot:GetRight())
+    local leftClearDist = DDBot.IsDirClear(bot, -bot:GetRight())
+    local backIsClear = backClearDist >= 100
+    local rightIsClear = rightClearDist >= 100
+    local leftIsClear = leftClearDist >= 100
     local visibleTargetPos
 
     if not IsValid(controller) then
@@ -1077,6 +1083,10 @@ function DDBot.PlayerMove(bot, cmd, mv)
                         resultingSideSpeed = -maxSpeed
                     elseif rightIsClear then
                         resultingSideSpeed = maxSpeed
+                    elseif leftClearDist > 0 or rightClearDist > 0 then
+                        resultingSideSpeed = leftClearDist >= rightClearDist and -maxSpeed or maxSpeed
+                    else
+                        resultingSideSpeed = 0
                     end
                 end
 
@@ -1099,6 +1109,10 @@ function DDBot.PlayerMove(bot, cmd, mv)
                     strafeDir = -1
                 elseif rightIsClear then
                     strafeDir = 1
+                elseif leftClearDist > 0 or rightClearDist > 0 then
+                    strafeDir = leftClearDist >= rightClearDist and -1 or 1
+                else
+                    strafeDir = 0
                 end
 
                 controller.CombatStrafeDir = strafeDir
@@ -1153,7 +1167,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local goalpos = curgoal.pos
 
     -- Stuck logic
-    if bot:GetVelocity():Length2DSqr() <= 225 and (not isKothMode or not inobjective) and not reachedDest then
+    if bot:GetVelocity():Length2DSqr() <= 225 and not inobjective and not reachedDest then
         if controller.NextCenter < curTime then
             controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
             controller.NextCenter = curTime + math.Rand(0.3, 0.65)
@@ -1206,7 +1220,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     local botShootPos = bot:GetShootPos()
     if IsValid(controller.Target) and (melee and visibleTargetPos or not melee) then
-        if isKothMode and inobjective and not melee then
+        if inobjective and not melee then
             resultingForwardSpeed = 0
         end
 
@@ -1244,7 +1258,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
         bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, targetAng))
     else
-        if isKothMode and inobjective then
+        if inobjective then
             resultingForwardSpeed = 0
 
             if controller.LookAtTime < curTime then
