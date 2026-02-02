@@ -1258,7 +1258,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
         bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, targetAng))
     else
-        if inobjective then
+        if inobjective and not backingUp then
             resultingForwardSpeed = 0
 
             if controller.LookAtTime < curTime then
