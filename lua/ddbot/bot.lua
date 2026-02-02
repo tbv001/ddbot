@@ -232,17 +232,19 @@ function DDBot.IsTargetVisible(bot, target, ignore)
     if not IsValid(target) or not IsValid(bot) then return nil end
 
     local targetCenter = target:WorldSpaceCenter()
+    local botEyePos = bot:EyePos()
 
-    -- Field of view check
-    if not DDBot.IsPosWithinFOV(bot, targetCenter) then
-        return nil
+    if botEyePos:DistToSqr(targetCenter) > 10000 then 
+        -- Field of view check
+        if not DDBot.IsPosWithinFOV(bot, targetCenter) then
+            return nil
+        end
     end
 
     if target.IsGhosting and target:IsGhosting() then
         return nil
     end
 
-    local botEyePos = bot:EyePos()
 
     -- For props
     if not target:IsPlayer() then
