@@ -46,48 +46,52 @@ function ENT:Initialize()
 	self.NextPropCheck = 0
 end
 
+local function pathGenerator(ent, area, fromArea, ladder, elevator, length)
+	if (not IsValid(fromArea)) then
+		return 0
+	else
+		if (not ent.loco:IsAreaTraversable(area)) then
+			return -1
+		end
+
+		local dist = 0
+
+		if (IsValid(ladder)) then
+			dist = ladder:GetLength()
+		elseif (length > 0) then
+			dist = length
+		else
+			dist = (area:GetCenter() - fromArea:GetCenter()):GetLength()
+		end
+
+		local cost = dist + fromArea:GetCostSoFar()
+
+		if not IsValid(ladder) then
+			local deltaZ = fromArea:ComputeAdjacentConnectionHeightChange(area)
+			if (deltaZ >= ent.loco:GetStepHeight()) then
+				if (deltaZ >= ent.loco:GetMaxJumpHeight()) then
+					return -1
+				end
+			elseif (deltaZ < -ent.loco:GetDeathDropHeight()) then
+				return -1
+			end
+		end
+
+		return cost
+	end
+end
+
 function ENT:ChasePos()
 	self.P = Path("Follow")
 	self.P:SetMinLookAheadDistance(300)
 	self.P:SetGoalTolerance(20)
-	self.P:Compute(self, self.PosGen, function(area, fromArea, ladder, elevator, length) 
-		if (not IsValid(fromArea)) then
-			return 0
-		else
-			if (not self.loco:IsAreaTraversable(area)) then
-				return -1
-			end
-
-			local dist = 0
-
-			if (IsValid(ladder)) then
-				dist = ladder:GetLength()
-			elseif (length > 0) then
-				dist = length
-			else
-				dist = (area:GetCenter() - fromArea:GetCenter()):GetLength()
-			end
-
-			local cost = dist + fromArea:GetCostSoFar()
-
-			local deltaZ = fromArea:ComputeAdjacentConnectionHeightChange(area)
-			if (deltaZ >= self.loco:GetStepHeight()) then
-				if (deltaZ >= self.loco:GetMaxJumpHeight()) then
-					return -1
-				end
-			elseif (deltaZ < -self.loco:GetDeathDropHeight()) then
-				return -1
-			end
-
-			return cost
-		end
-	end)
+	self.P:Compute(self, self.PosGen, function(area, fromArea, ladder, elevator, length) return pathGenerator(self, area, fromArea, ladder, elevator, length) end)
 
 	if not IsValid(self.P) then return end
 
 	while IsValid(self.P) do
 		if self.PosGen then
-			self.P:Compute(self, self.PosGen)
+			self.P:Compute(self, self.PosGen, function(area, fromArea, ladder, elevator, length) return pathGenerator(self, area, fromArea, ladder, elevator, length) end)
 			self.cur_segment = 2
 		end
 
