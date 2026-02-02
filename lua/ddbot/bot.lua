@@ -1248,7 +1248,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
             mv:SetForwardSpeed(0)
 
             if controller.LookAtTime < curTime then
-                controller.LookAt = bot:EyePos() + VectorRand() * 100
+                local vectorRand = VectorRand()
+                vectorRand.z = 0
+                controller.LookAt = bot:EyePos() + vectorRand * 100
                 controller.LookAtTime = curTime + math.Rand(0.9, 1.3)
             end
         end
