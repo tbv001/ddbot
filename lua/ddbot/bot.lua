@@ -1136,7 +1136,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
     end
 
-    if botPos:DistToSqr(controller.PosGen) < 900 or (visibleTargetPos and botPos:DistToSqr(controller.PosGen) < 250000 and not melee and not backingUp) then
+    if botPos:DistToSqr(controller.PosGen) < 900 or (visibleTargetPos and not melee and not backingUp) then
         resultingForwardSpeed = 0
         reachedDest = true
     end
