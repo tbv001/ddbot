@@ -475,15 +475,34 @@ function DDBot.IsDirClear(bot, dir)
     end
 
     local center = bot:WorldSpaceCenter()
+    local endPos = center + dir * 100
     local tr = util.TraceHull({
         start = center,
-        endpos = center + dir * 50,
+        endpos = endPos,
         mins = Vector(-13, -13, -13),
         maxs = Vector(13, 13, 13),
         filter = {bot, controller},
         mask = MASK_PLAYERSOLID
     })
-    return not tr.Hit
+
+    if tr.Hit then
+        return false
+    end
+
+    local botPos = bot:GetPos()
+    local checkPos = botPos + dir * 75
+    local groundTrace = util.TraceLine({
+        start = checkPos,
+        endpos = checkPos - Vector(0, 0, 18),
+        filter = {bot, controller},
+        mask = MASK_PLAYERSOLID
+    })
+
+    if not groundTrace.StartSolid and not groundTrace.Hit then
+        return false
+    end
+
+    return true
 end
 
 
@@ -846,6 +865,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local inobjective = false
     local reachedDest = false
     local backingUp = false
+    local backIsClear = DDBot.IsDirClear(bot, -bot:GetForward())
+    local rightIsClear = DDBot.IsDirClear(bot, bot:GetRight())
+    local leftIsClear = DDBot.IsDirClear(bot, -bot:GetRight())
     local visibleTargetPos
 
     if not IsValid(controller) then
@@ -1046,14 +1068,10 @@ function DDBot.PlayerMove(bot, cmd, mv)
             local backupDist = not zombies and 40000 or 160000
 
             if distance <= backupDist and not melee then
-                local backDir = -bot:GetForward()
-                local rightDir = bot:GetRight()
-                local leftDir = -rightDir
-
-                if not DDBot.IsDirClear(bot, backDir) then
-                    if DDBot.IsDirClear(bot, leftDir) then
+                if not backIsClear then
+                    if leftIsClear then
                         mv:SetSideSpeed(-maxSpeed)
-                    elseif DDBot.IsDirClear(bot, rightDir) then
+                    elseif rightIsClear then
                         mv:SetSideSpeed(maxSpeed)
                     end
                 end
@@ -1062,21 +1080,20 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 mv:SetForwardSpeed(-maxSpeed)
             end
 
+            local botSideSpeed = mv:GetSideSpeed()
+
             -- Combat movement (strafing, jumping)
-            if cv_CombatMovementEnabled and controller.NextCombatMove < curTime then
+            if cv_CombatMovementEnabled and (controller.NextCombatMove < curTime or (botSideSpeed > 0 and not rightIsClear or botSideSpeed < 0 and not leftIsClear)) then
                 controller.NextCombatMove = curTime + math.Rand(0.5, 1.5)
 
                 -- Random strafe
-                local rightDir = bot:GetRight()
-                local leftClear = DDBot.IsDirClear(bot, -rightDir)
-                local rightClear = DDBot.IsDirClear(bot, rightDir)
                 local strafeDir
 
-                if leftClear and rightClear then
+                if leftIsClear and rightIsClear then
                     strafeDir = math.random(2) == 1 and 1 or -1
-                elseif leftClear then
+                elseif leftIsClear then
                     strafeDir = -1
-                elseif rightClear then
+                elseif rightIsClear then
                     strafeDir = 1
                 else
                     strafeDir = math.random(2) == 1 and 1 or -1
