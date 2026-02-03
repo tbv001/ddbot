@@ -28,7 +28,6 @@ function ENT:Initialize()
 	self.LookAtTime = 0
 	self.ForcedLookAt = false
 	self.goalPos = Vector(0, 0, 0)
-	self.strafeAngle = 0
 	self.nextStuckJump = 0
 	self.NextCombatMove = 0
 	self.CombatStrafeDir = 0
@@ -44,6 +43,11 @@ function ENT:Initialize()
 	self.ForceShoot = false
 	self.ForceCast = false
 	self.NextPropCheck = 0
+	self.LastStuckPos = nil
+	self.NextStuckPosUpdate = 0
+	self.StuckTime = 0
+	self.StuckStrafeDir = 1
+	self.NextStuckStrafe = 0
 end
 
 local function pathGenerator(ent, area, fromArea, ladder, elevator, length)

@@ -488,6 +488,11 @@ function DDBot.IsDirClear(bot, dir)
     })
 
     local clearDist = dirRange * tr.Fraction
+
+    if clearDist < 20 then
+        return 0
+    end
+
     local botPos = bot:GetPos()
 
     for _, frac in ipairs(groundCheckFractions) do
@@ -499,12 +504,12 @@ function DDBot.IsDirClear(bot, dir)
             mask = MASK_PLAYERSOLID_BRUSHONLY
         })
 
-        if groundTrace.StartSolid or groundTrace.Hit then
-            return clearDist * frac
+        if not groundTrace.StartSolid and not groundTrace.Hit then
+            return 0
         end
     end
 
-    return 0
+    return clearDist
 end
 
 
@@ -869,6 +874,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local inobjective = false
     local reachedDest = false
     local backingUp = false
+    local combatMovement = false
     local backClearDist = DDBot.IsDirClear(bot, -bot:GetForward())
     local rightClearDist = DDBot.IsDirClear(bot, bot:GetRight())
     local leftClearDist = DDBot.IsDirClear(bot, -bot:GetRight())
@@ -1122,6 +1128,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             end
 
             if controller.CombatStrafeDir ~= 0 and not melee and not backingUp then
+                combatMovement = true
                 resultingSideSpeed = controller.CombatStrafeDir * maxSpeed
             end
         end
@@ -1165,25 +1172,35 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local goalpos = curgoal.pos
 
     -- Stuck logic
-    if bot:GetVelocity():Length2DSqr() <= 900 and not inobjective and not reachedDest then
-        if controller.NextCenter < curTime then
-            controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
-            controller.NextCenter = curTime + math.Rand(0.3, 0.65)
-        elseif controller.nextStuckJump < curTime then
-            if not bot:Crouching() then
-                controller.NextJump = 0
-            end
-            controller.nextStuckJump = curTime + math.Rand(1, 2)
-        end
-    end
+    if not inobjective and not reachedDest and not combatMovement then
+        if controller.NextStuckPosUpdate < curTime then
+            local lastStuckPos = controller.LastStuckPos or botPos
+            local movedDistSqr = botPos:DistToSqr(lastStuckPos)
 
-    if controller.NextCenter > curTime then
-        if controller.strafeAngle == 1 then
-            resultingSideSpeed = maxSpeed
-        elseif controller.strafeAngle == 2 then
-            resultingSideSpeed = -maxSpeed
-        else
-            resultingForwardSpeed = 0
+            controller.LastStuckPos = botPos
+            controller.NextStuckPosUpdate = curTime + 0.5
+
+            if movedDistSqr < 400 then
+                controller.StuckTime = (controller.StuckTime or 0) + 0.5
+            else
+                controller.StuckTime = 0
+            end
+        end
+
+        if controller.StuckTime >= 0.5 then
+            if controller.NextStuckStrafe < curTime then
+                controller.StuckStrafeDir = controller.StuckStrafeDir == 1 and -1 or 1
+                controller.NextStuckStrafe = curTime + math.Rand(0.3, 0.65)
+            end
+
+            if controller.nextStuckJump < curTime then
+                if not bot:Crouching() then
+                    controller.NextJump = 0
+                end
+                controller.nextStuckJump = curTime + math.Rand(1, 2)
+            end
+
+            resultingSideSpeed = controller.StuckStrafeDir * maxSpeed
         end
     end
 
