@@ -1220,9 +1220,13 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     local botShootPos = bot:GetShootPos()
-    if IsValid(controller.Target) and (melee and visibleTargetPos or not melee) then
+    if IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget < curTime) then
         if inobjective and not melee then
             resultingForwardSpeed = 0
+        end
+
+        if visibleTargetPos then
+            controller.LastSeenTarget = curTime + 1
         end
 
         local aimAtPos = visibleTargetPos or controller.Target:WorldSpaceCenter()
