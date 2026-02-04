@@ -969,13 +969,15 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
     end
 
+    local objectivePos
     local isKothMode = gameType == "koth"
     if isKothMode then
         if objective and IsValid(objective) then
             objective.radius2d = objective.radius2d or ((objective:GetRadius() - 12) * (objective:GetRadius() - 12) / 1.5)
+            objectivePos = objective:GetPos()
         end
 
-        inobjective = objective and IsValid(objective) and objective:GetPos():DistToSqr(controller:GetPos()) <= objective.radius2d
+        inobjective = objectivePos and objectivePos:DistToSqr(botPos) <= objective.radius2d
     end
 
     local isHtfMode = gameType == "htf"
@@ -1054,7 +1056,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         local distance = targetPos:DistToSqr(botPos)
 
         -- Move to our target
-        if not bot:IsCarryingFlag() and (not zombies or bot:IsThug()) and (not melee and not inobjective or melee) then
+        if not bot:IsCarryingFlag() and (not zombies or bot:IsThug()) and (not melee and not inobjective and (not objectivePos or botPos:DistToSqr(objectivePos) > 250000) or melee) then
             controller.PosGen = targetPos
             controller.LastSegmented = curTime + (melee and math.Rand(0.7, 0.9) or math.Rand(1.1, 1.3))
         end
