@@ -50,7 +50,6 @@ local cv_CombatMovementEnabled = true
 local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
 local cv_AimPredictionEnabled = true
---local groundCheckFractions = {1, 0.75, 0.5, 0.25}
 local groundCheckOffset = Vector(0, 0, 44)
 local dirCheckHullMins = Vector(-13, -13, -13)
 local dirCheckHullMaxs = Vector(13, 13, 13)
@@ -285,7 +284,7 @@ function DDBot.IsTargetVisible(bot, target, ignore)
     local targetCenter = target:WorldSpaceCenter()
     local botEyePos = bot:EyePos()
 
-    if botEyePos:DistToSqr(targetCenter) > 10000 then 
+    if botEyePos:DistToSqr(targetCenter) > 2500 then 
         -- Field of view check
         if not DDBot.IsPosWithinFOV(bot, targetCenter) then
             return nil
@@ -295,7 +294,6 @@ function DDBot.IsTargetVisible(bot, target, ignore)
     if target.IsGhosting and target:IsGhosting() then
         return nil
     end
-
 
     -- For props
     if not target:IsPlayer() then
@@ -309,31 +307,6 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         return tr.Entity == target and targetCenter or nil
     end
 
-    -- local count = target:GetHitBoxCount(0)
-    -- if not count or count == 0 then
-    --     return nil
-    -- end
-
-    -- Iterate through hitboxes/bones
-    -- for i = 0, count - 1 do
-    --     local bone = target:GetHitBoxBone(i, 0)
-    --     if bone then
-    --         local pos = target:GetBonePosition(bone)
-    --         if pos then
-    --             local tr = util.TraceLine({
-    --                 start = botEyePos,
-    --                 endpos = pos,
-    --                 filter = ignore,
-    --                 mask = MASK_VISIBLE
-    --             })
-
-    --             if not tr.Hit then
-    --                 return pos
-    --             end
-    --         end
-    --     end
-    -- end
-
     local targetEyePos = target:EyePos()
     local tr = util.TraceLine({
         start = botEyePos,
@@ -344,6 +317,29 @@ function DDBot.IsTargetVisible(bot, target, ignore)
 
     if not tr.Hit then
         return targetEyePos
+    end
+
+    local tr2 = util.TraceLine({
+        start = botEyePos,
+        endpos = targetCenter,
+        filter = ignore,
+        mask = MASK_VISIBLE
+    })
+
+    if not tr2.Hit then
+        return targetCenter
+    end
+
+    local targetPos = target:GetPos()
+    local tr3 = util.TraceLine({
+        start = botEyePos,
+        endpos = targetPos,
+        filter = ignore,
+        mask = MASK_VISIBLE
+    })
+
+    if not tr3.Hit then
+        return targetPos
     end
 
     return nil
@@ -516,20 +512,6 @@ function DDBot.IsDirClear(bot, dir)
     end
 
     local botPos = bot:GetPos()
-
-    -- for _, frac in ipairs(groundCheckFractions) do
-    --     local checkPos = botPos + dir * (clearDist * frac)
-    --     local groundTrace = util.TraceLine({
-    --         start = checkPos,
-    --         endpos = checkPos - groundCheckOffset,
-    --         filter = {bot, controller},
-    --         mask = MASK_PLAYERSOLID_BRUSHONLY
-    --     })
-
-    --     if not groundTrace.StartSolid and not groundTrace.Hit then
-    --         return 0
-    --     end
-    -- end
 
     local checkPos = botPos + dir * clearDist
     local groundTrace = util.TraceLine({
