@@ -1,4 +1,6 @@
 local include = include
+local Vector = Vector
+local Angle = Angle
 local concommand = concommand
 local IsValid = IsValid
 local pairs = pairs
@@ -8,26 +10,25 @@ local GetConVar = GetConVar
 local MsgN = MsgN
 local navmesh = navmesh
 local CreateConVar = CreateConVar
+local cvars = cvars
+local tonumber = tonumber
+local tobool = tobool
+local math = math
 local ents = ents
 local game = game
 local player_manager = player_manager
 local table = table
 local tostring = tostring
 local CurTime = CurTime
-local math = math
 local util = util
 local team = team
 local Color = Color
-local Vector = Vector
 local ipairs = ipairs
 local timer = timer
-local tonumber = tonumber
 local VectorRand = VectorRand
 local FrameTime = FrameTime
-local Angle = Angle
 local LerpAngle = LerpAngle
-local cvars = cvars
-local tobool = tobool
+local coroutine = coroutine
 local hook = hook
 
 include("ddbot/shared.lua")
@@ -42,17 +43,20 @@ local cachedPrimaries, cachedSecondaries
 local cachedSpells, cachedPerks, cachedBuilds
 local cv_QuotaVal = 0
 local cv_AimSpeedMultVal = 1
-local cv_FOVVal = 100
+local cv_FOVVal = math.cos(math.rad(50))
 local cv_SlideEnabled = true
 local cv_DiveEnabled = true
 local cv_CombatMovementEnabled = true
 local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
 local cv_AimPredictionEnabled = true
-local groundCheckFractions = {1, 0.75, 0.5, 0.25}
+--local groundCheckFractions = {1, 0.75, 0.5, 0.25}
 local groundCheckOffset = Vector(0, 0, 44)
 local dirCheckHullMins = Vector(-13, -13, -13)
 local dirCheckHullMaxs = Vector(13, 13, 13)
+local supportQueue = {}
+local tempVector = Vector(0, 0, 0)
+local tempAngle = Angle(0, 0, 0)
 
 
 --[[----------------------------
@@ -135,6 +139,50 @@ local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHI
 local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
 local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
 
+--[[----------------------------
+    ConVar Change Callbacks
+----------------------------]]--
+
+cvars.AddChangeCallback("dd_bot_quota", function(convar_name, value_old, value_new)
+    cv_QuotaVal = tonumber(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_aim_speed_mult", function(convar_name, value_old, value_new)
+    cv_AimSpeedMultVal = tonumber(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_slide", function(convar_name, value_old, value_new)
+    cv_SlideEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_dive", function(convar_name, value_old, value_new)
+    cv_DiveEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_combat_movement", function(convar_name, value_old, value_new)
+    cv_CombatMovementEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_use_grenades", function(convar_name, value_old, value_new)
+    cv_CanUseGrenadesEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_use_spells", function(convar_name, value_old, value_new)
+    cv_CanUseSpellsEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_aim_prediction", function(convar_name, value_old, value_new)
+    cv_AimPredictionEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_aim_spread_mult", function(convar_name, value_old, value_new)
+    cv_AimSpreadMult = tonumber(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_fov", function(convar_name, value_old, value_new)
+    cv_FOVVal = math.cos(math.rad(tonumber(value_new) / 2))
+end)
+
 
 --[[----------------------------
     Functions
@@ -153,7 +201,7 @@ function DDBot.Init()
     cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
     cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
     cv_AimSpreadMult = cv_AimSpreadMult:GetFloat()
-    cv_FOVVal = cv_FOV:GetInt()
+    cv_FOVVal = math.cos(math.rad(cv_FOV:GetInt() / 2))
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -226,7 +274,7 @@ function DDBot.IsPosWithinFOV(bot, pos)
 
     local aimVec = bot:GetAimVector()
     local dot = aimVec.x * diffX + aimVec.y * diffY + aimVec.z * diffZ
-    local cosVal = math.cos(math.rad(cv_FOVVal / 2))
+    local cosVal = cv_FOVVal
 
     return dot >= 0 and dot * dot >= cosVal * cosVal * distSqr
 end
@@ -261,29 +309,41 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         return tr.Entity == target and targetCenter or nil
     end
 
-    local count = target:GetHitBoxCount(0)
-    if not count or count == 0 then
-        return nil
-    end
+    -- local count = target:GetHitBoxCount(0)
+    -- if not count or count == 0 then
+    --     return nil
+    -- end
 
     -- Iterate through hitboxes/bones
-    for i = 0, count - 1 do
-        local bone = target:GetHitBoxBone(i, 0)
-        if bone then
-            local pos = target:GetBonePosition(bone)
-            if pos then
-                local tr = util.TraceLine({
-                    start = botEyePos,
-                    endpos = pos,
-                    filter = ignore,
-                    mask = MASK_VISIBLE
-                })
+    -- for i = 0, count - 1 do
+    --     local bone = target:GetHitBoxBone(i, 0)
+    --     if bone then
+    --         local pos = target:GetBonePosition(bone)
+    --         if pos then
+    --             local tr = util.TraceLine({
+    --                 start = botEyePos,
+    --                 endpos = pos,
+    --                 filter = ignore,
+    --                 mask = MASK_VISIBLE
+    --             })
 
-                if not tr.Hit then
-                    return pos
-                end
-            end
-        end
+    --             if not tr.Hit then
+    --                 return pos
+    --             end
+    --         end
+    --     end
+    -- end
+
+    local targetEyePos = target:EyePos()
+    local tr = util.TraceLine({
+        start = botEyePos,
+        endpos = targetEyePos,
+        filter = ignore,
+        mask = MASK_VISIBLE
+    })
+
+    if not tr.Hit then
+        return targetEyePos
     end
 
     return nil
@@ -424,45 +484,7 @@ end
 
 function DDBot.GiveSupport(ply, target)
     if not IsValid(ply) or not IsValid(target) then return end
-
-    local curTime = CurTime()
-    local plyPos = ply:GetPos()
-    local plyTeam = ply.Team and ply:Team()
-    local targetPos = target:GetPos()
-    local targetCenter = target:WorldSpaceCenter()
-    local canSetPos = gameType ~= "koth" and gameType ~= "htf"
-
-    for _, bot in ipairs(player.GetBots()) do
-        if bot == ply or not IsValid(bot) then
-            continue
-        end
-
-        local controller = bot.ControllerBot
-        if not IsValid(controller) then
-            continue
-        end
-
-        if plyTeam and bot.Team and bot:Team() ~= plyTeam then
-            continue
-        end
-
-        local isVisible = bot:VisibleVec(ply:EyePos())
-        if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then
-            continue
-        end
-
-        if not IsValid(controller.Target) then
-            if canSetPos then
-                controller.PosGen = targetPos
-                controller.LastSegmented = curTime + 5
-            end
-
-            if isVisible then
-                controller.LookAt = targetCenter
-                controller.LookAtTime = curTime + 1
-            end
-        end
-    end
+    supportQueue[#supportQueue + 1] = {ply = ply, target = target}
 end
 
 function DDBot.IsDirClear(bot, dir)
@@ -475,7 +497,7 @@ function DDBot.IsDirClear(bot, dir)
         return 0
     end
 
-    local dirRange = 100
+    local dirRange = 75
     local center = bot:WorldSpaceCenter()
     local endPos = center + dir * dirRange
     local tr = util.TraceHull({
@@ -495,18 +517,30 @@ function DDBot.IsDirClear(bot, dir)
 
     local botPos = bot:GetPos()
 
-    for _, frac in ipairs(groundCheckFractions) do
-        local checkPos = botPos + dir * (clearDist * frac)
-        local groundTrace = util.TraceLine({
-            start = checkPos,
-            endpos = checkPos - groundCheckOffset,
-            filter = {bot, controller},
-            mask = MASK_PLAYERSOLID_BRUSHONLY
-        })
+    -- for _, frac in ipairs(groundCheckFractions) do
+    --     local checkPos = botPos + dir * (clearDist * frac)
+    --     local groundTrace = util.TraceLine({
+    --         start = checkPos,
+    --         endpos = checkPos - groundCheckOffset,
+    --         filter = {bot, controller},
+    --         mask = MASK_PLAYERSOLID_BRUSHONLY
+    --     })
 
-        if not groundTrace.StartSolid and not groundTrace.Hit then
-            return 0
-        end
+    --     if not groundTrace.StartSolid and not groundTrace.Hit then
+    --         return 0
+    --     end
+    -- end
+
+    local checkPos = botPos + dir * clearDist
+    local groundTrace = util.TraceLine({
+        start = checkPos,
+        endpos = checkPos - groundCheckOffset,
+        filter = {bot, controller},
+        mask = MASK_PLAYERSOLID_BRUSHONLY
+    })
+
+    if not groundTrace.StartSolid and not groundTrace.Hit then
+        return 0
     end
 
     return clearDist
@@ -916,71 +950,27 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local zombies = gameType == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
 
-    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or not IsValid(controller.Target) or not controller.Target:Alive() or (controller.Target.IsGhosting and controller.Target:IsGhosting()) then
+    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or controller.ForgetTarget < curTime or not IsValid(controller.Target) or not controller.Target:Alive() or (controller.Target.IsGhosting and controller.Target:IsGhosting()) then
         controller.Target = nil
     end
 
-    local targets = {}
-    local botTeam = bot:Team()
-
-    for _, ply in player.Iterator() do
-        if ply ~= bot and ply:Alive() then
-            local isEnemy = not isTeamPlay or ply:Team() ~= botTeam
-
-            if isEnemy and ply:GetPos():DistToSqr(botPos) < 2250000 then
-                targets[#targets + 1] = ply
-            end
-        end
+    -- Target acquisition
+    if controller.PendingTarget then
+        controller.Target = controller.PendingTarget
+        controller.ForgetTarget = curTime + 2
+        controller.ForceShoot = false
+        controller.PendingTarget = nil
     end
 
-    local targetCount = #targets
-    if targetCount > 1 then
-        table.sort(targets, function(a, b)
-            return a:GetPos():DistToSqr(botPos) < b:GetPos():DistToSqr(botPos)
-        end)
-    end
-
-    for i = 1, targetCount do
-        local ply = targets[i]
-        local isTargetVisible = DDBot.IsTargetVisible(bot, ply, {bot, controller})
-        if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or botPos:DistToSqr(controller.Target:GetPos()) > botPos:DistToSqr(ply:GetPos())) then
-            controller.Target = ply
-            controller.ForgetTarget = curTime + 2
-            controller.ForceShoot = false
-            break
-        end
-    end
-
-    -- Break props and func_breakables
-    if not IsValid(controller.Target) and controller.NextPropCheck < curTime then
-        controller.NextPropCheck = curTime + 0.1
-        local radiusCheck = melee and 50 or 100
-        local propsInRadius = ents.FindInSphere(botPos, radiusCheck)
-        local closestDist = math.huge
-        local closestProp
-
-        for _, prop in ipairs(propsInRadius) do
-            if (string.StartsWith(prop:GetClass(), "prop_") or prop:GetClass() == "func_breakable") and prop:Health() > 0 then
-                local explodeDamage = prop:GetKeyValues()["ExplodeDamage"]
-                if explodeDamage and tonumber(explodeDamage) > 0 then
-                    continue
-                end
-
-                local dist = botPos:DistToSqr(prop:GetPos())
-                if dist < closestDist then
-                    closestDist = dist
-                    closestProp = prop
-                end
-            end
-        end
-
-        if closestProp and DDBot.IsTargetVisible(bot, closestProp, {bot, controller}) then
-            controller.LookAt = closestProp:WorldSpaceCenter()
-            controller.LookAtTime = curTime + 0.1
-            controller.ForceShoot = true
-        else
-            controller.ForceShoot = false
-        end
+    -- Prop checking
+    if controller.PendingProp then
+        controller.LookAt = controller.PendingProp:WorldSpaceCenter()
+        controller.LookAtTime = curTime + 0.1
+        controller.ForceShoot = true
+        controller.PendingProp = nil
+    elseif controller.PendingForceShootOff then
+        controller.ForceShoot = false
+        controller.PendingForceShootOff = nil
     end
 
     if doorEnabled then
@@ -1020,7 +1010,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
                     end
 
                     rand = VectorRand() * rand
-                    controller.PosGen = flag:GetPos() + Vector(rand.x, rand.y, 0)
+                    tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
+                    controller.PosGen = flag:GetPos() + tempVector
                     controller.LastSegmented = curTime + 2
                 end
             end
@@ -1039,7 +1030,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 end
 
                 rand = VectorRand() * rand
-                controller.PosGen = point_pos + Vector(rand.x, rand.y, 0)
+                tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
+                controller.PosGen = point_pos + tempVector
                 controller.LastSegmented = curTime + 2
             end
         elseif zombies then
@@ -1055,9 +1047,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
             else
                 local leader = DDBot.GetLeader(bot)
                 if IsValid(leader) and leader ~= bot then
-                    local rand = VectorRand() * 200
-                    rand.z = 0
-                    controller.PosGen = leader:GetPos() + rand
+                    local rand = VectorRand()
+                    tempVector.x, tempVector.y, tempVector.z = rand.x * 200, rand.y * 200, 0
+                    controller.PosGen = leader:GetPos() + tempVector
                     controller.LastSegmented = curTime + 2
                 else
                     controller.PosGen = DDBot.FindRandomSpot(bot)
@@ -1267,7 +1259,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
         local targetAng = (aimAtPos - botShootPos):Angle()
 
         if cv_AimSpreadMult > 0 then
-            targetAng = targetAng + Angle(math.Rand(-5, 5), math.Rand(-5, 5), 0) * cv_AimSpreadMult
+            tempAngle.p, tempAngle.y, tempAngle.r = math.Rand(-5, 5), math.Rand(-5, 5), 0
+            targetAng = targetAng + tempAngle * cv_AimSpreadMult
         end
 
         if controller.ForcedLookAt and controller.LookAtTime > curTime then
@@ -1282,9 +1275,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
             resultingForwardSpeed = 0
 
             if controller.LookAtTime < curTime then
-                local vectorRand = VectorRand()
-                vectorRand.z = 0
-                controller.LookAt = bot:EyePos() + vectorRand * 100
+                local rand = VectorRand()
+                tempVector.x, tempVector.y, tempVector.z = rand.x * 100, rand.y * 100, 0
+                controller.LookAt = bot:EyePos() + tempVector
                 controller.LookAtTime = curTime + math.Rand(0.9, 1.3)
             end
         end
@@ -1320,7 +1313,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         useAimSpeedMult = false
     end
 
-    local lerpResult = useAimSpeedMult and lerpc or lerp
+    local lerpResult = useAimSpeedMult and lerp or lerpc
     resultingMoveAngle = resultingMoveAngle or mva
     bot:SetEyeAngles(LerpAngle(lerpResult, botEyeAngles, resultingEyeAngle))
     mv:SetMoveAngles(resultingMoveAngle)
@@ -1328,50 +1321,146 @@ function DDBot.PlayerMove(bot, cmd, mv)
     mv:SetSideSpeed(resultingSideSpeed)
 end
 
-
 --[[----------------------------
-    ConVar Change Callbacks
+    Coroutines
 ----------------------------]]--
 
-cvars.AddChangeCallback("dd_bot_quota", function(convar_name, value_old, value_new)
-    cv_QuotaVal = tonumber(value_new)
-end)
+local processingLimit = 100
+local curProcessing = 0
+local updateCoroutine = nil
 
-cvars.AddChangeCallback("dd_bot_aim_speed_mult", function(convar_name, value_old, value_new)
-    cv_AimSpeedMultVal = tonumber(value_new)
-end)
+function DDBot.UpdateBots()
+    local curTime = CurTime()
 
-cvars.AddChangeCallback("dd_bot_slide", function(convar_name, value_old, value_new)
-    cv_SlideEnabled = tobool(value_new)
-end)
+    local function shouldYield()
+        curProcessing = curProcessing + 1
+        if curProcessing >= processingLimit then
+            curProcessing = 0
+            coroutine.yield()
+        end
+    end
 
-cvars.AddChangeCallback("dd_bot_dive", function(convar_name, value_old, value_new)
-    cv_DiveEnabled = tobool(value_new)
-end)
+    for _, bot in player.Iterator() do
+        if not bot:IsBot() or not bot:Alive() then continue end
 
-cvars.AddChangeCallback("dd_bot_combat_movement", function(convar_name, value_old, value_new)
-    cv_CombatMovementEnabled = tobool(value_new)
-end)
+        local controller = bot.ControllerBot
+        if not IsValid(controller) then continue end
 
-cvars.AddChangeCallback("dd_bot_use_grenades", function(convar_name, value_old, value_new)
-    cv_CanUseGrenadesEnabled = tobool(value_new)
-end)
+        local botPos = bot:GetPos()
+        local botTeam = bot:Team()
+        local targets = {}
 
-cvars.AddChangeCallback("dd_bot_use_spells", function(convar_name, value_old, value_new)
-    cv_CanUseSpellsEnabled = tobool(value_new)
-end)
+        -- Check for targets
+        for _, ply in player.Iterator() do
+            if ply ~= bot and ply:Alive() then
+                local isEnemy = not isTeamPlay or ply:Team() ~= botTeam
 
-cvars.AddChangeCallback("dd_bot_aim_prediction", function(convar_name, value_old, value_new)
-    cv_AimPredictionEnabled = tobool(value_new)
-end)
+                if isEnemy and ply:GetPos():DistToSqr(botPos) < 2250000 then
+                    targets[#targets + 1] = ply
+                end
+            end
+            shouldYield()
+        end
 
-cvars.AddChangeCallback("dd_bot_aim_spread_mult", function(convar_name, value_old, value_new)
-    cv_AimSpreadMult = tonumber(value_new)
-end)
+        local targetCount = #targets
+        if targetCount > 1 then
+            table.sort(targets, function(a, b)
+                return a:GetPos():DistToSqr(botPos) < b:GetPos():DistToSqr(botPos)
+            end)
+        end
 
-cvars.AddChangeCallback("dd_bot_fov", function(convar_name, value_old, value_new)
-    cv_FOVVal = tonumber(value_new)
-end)
+        for i = 1, targetCount do
+            local ply = targets[i]
+            local isTargetVisible = DDBot.IsTargetVisible(bot, ply, {bot, controller})
+            if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or botPos:DistToSqr(controller.Target:GetPos()) > botPos:DistToSqr(ply:GetPos())) then
+                controller.PendingTarget = ply
+                break
+            end
+            shouldYield()
+        end
+
+        -- Prop and breakable checking
+        if not IsValid(controller.Target) and controller.NextPropCheck < curTime then
+            controller.NextPropCheck = curTime + 0.1
+            local wep = bot:GetActiveWeapon()
+            local melee = IsValid(wep) and wep.Base == "dd_meleebase"
+            local radiusCheck = melee and 50 or 100
+            local propsInRadius = ents.FindInSphere(botPos, radiusCheck)
+            local closestDist = math.huge
+            local closestProp
+
+            for _, prop in ipairs(propsInRadius) do
+                if (string.StartsWith(prop:GetClass(), "prop_") or prop:GetClass() == "func_breakable") and prop:Health() > 0 then
+                    local explodeDamage = prop:GetKeyValues()["ExplodeDamage"]
+                    if explodeDamage and tonumber(explodeDamage) > 0 then
+                        continue
+                    end
+
+                    local dist = botPos:DistToSqr(prop:GetPos())
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestProp = prop
+                    end
+                end
+                shouldYield()
+            end
+
+            if closestProp and DDBot.IsTargetVisible(bot, closestProp, {bot, controller}) then
+                controller.PendingProp = closestProp
+            else
+                controller.PendingForceShootOff = true
+            end
+        end
+
+        shouldYield()
+    end
+
+    -- Process support queue
+    local canSetPos = gameType ~= "koth" and gameType ~= "htf"
+    while #supportQueue > 0 do
+        local request = table.remove(supportQueue, 1)
+        local ply = request.ply
+        local target = request.target
+
+        if not IsValid(ply) or not IsValid(target) then continue end
+
+        local plyPos = ply:GetPos()
+        local plyTeam = ply.Team and ply:Team()
+        local targetPos = target:GetPos()
+        local targetCenter = target:WorldSpaceCenter()
+
+        for _, bot in ipairs(player.GetBots()) do
+            if bot == ply or not IsValid(bot) then continue end
+
+            local controller = bot.ControllerBot
+            if not IsValid(controller) then continue end
+
+            if plyTeam and bot.Team and bot:Team() ~= plyTeam then continue end
+
+            local isVisible = bot:VisibleVec(ply:EyePos())
+            if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then continue end
+
+            if not IsValid(controller.Target) then
+                if canSetPos then
+                    controller.PosGen = targetPos
+                    controller.LastSegmented = curTime + 5
+                end
+
+                if isVisible then
+                    controller.LookAt = targetCenter
+                    controller.LookAtTime = curTime + 1
+                end
+            end
+
+            shouldYield()
+        end
+
+        shouldYield()
+    end
+
+    coroutine.yield()
+end
+
 
 --[[----------------------------
     Hooks
@@ -1412,6 +1501,14 @@ hook.Add("PlayerDeath", "DDBot_PlayerDeath", function(bot, inflictor, attacker)
 end)
 
 hook.Add("Think", "DDBot_Think", function()
+    -- Coroutine
+    if not updateCoroutine or coroutine.status(updateCoroutine) == "dead" then
+        updateCoroutine = coroutine.create(DDBot.UpdateBots)
+    end
+    if coroutine.status(updateCoroutine) == "suspended" then
+        coroutine.resume(updateCoroutine)
+    end
+
     DDBot.Think()
 end)
 
