@@ -52,6 +52,7 @@ function ENT:Initialize()
 	self.PendingTarget = nil
 	self.PendingProp = nil
 	self.PendingForceShootOff = false
+	self.CurrentLadderTime = 0
 end
 
 local function pathGenerator(ent, area, fromArea, ladder, elevator, length)

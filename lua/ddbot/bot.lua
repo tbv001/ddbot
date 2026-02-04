@@ -865,7 +865,8 @@ function DDBot.StartCommand(bot, cmd)
 
     if isOnLadder then
         buttons = buttons + IN_FORWARD
-        controller.NextJump = curTime + 1
+    else
+        controller.CurrentLadderTime = curTime + 5
     end
 
     if not isSliding and not isOnLadder then
@@ -1282,7 +1283,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
     end
 
-    if isOnLadder and IsValid(controller.CurrentLadder) then
+    if isOnLadder and IsValid(controller.CurrentLadder) and (controller.CurrentLadderTime > curTime and controller.StuckTime < 1.0) then
         resultingForwardSpeed = maxSpeed
         resultingSideSpeed = 0
 
@@ -1298,6 +1299,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
         resultingMoveAngle = lookAngle
         resultingEyeAngle = lookAngle
         useAimSpeedMult = false
+    elseif isOnLadder then
+        bot:ExitLadder()
     end
 
     local lerpResult = useAimSpeedMult and lerp or lerpc
