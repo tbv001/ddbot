@@ -59,6 +59,7 @@ local targetVisTrace = {mask = MASK_VISIBLE}
 local propTrace = {mask = MASK_SHOT}
 local dirTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13)}
 local doorTrace = {}
+local cachedBotNames
 
 
 --[[----------------------------
@@ -209,6 +210,20 @@ function DDBot.Init()
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
     end
+
+    if not cachedBotNames then
+        cachedBotNames = {}
+        local namesPath = "data_static/ddbot_names.txt"
+        local content = file.Read(namesPath, "GAME")
+        if content then
+            for name in string.gmatch(content, "([^\r\n]+)") do
+                cachedBotNames[#cachedBotNames + 1] = name
+            end
+        end
+        if #cachedBotNames == 0 then
+            cachedBotNames[1] = "Bot"
+        end
+    end
 end
 
 function DDBot.AddBot(customName)
@@ -226,7 +241,7 @@ function DDBot.AddBot(customName)
         return
     end
 
-    local name = customName or "Bot #" .. #player.GetBots() + 1
+    local name = customName or cachedBotNames[math.random(#cachedBotNames)]
     local model = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
     local bot = player.CreateNextBot(name)
 
