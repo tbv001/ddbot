@@ -241,7 +241,32 @@ function DDBot.AddBot(customName)
         return
     end
 
-    local name = customName or cachedBotNames[math.random(#cachedBotNames)]
+    local name
+    if customName then
+        name = customName
+    else
+        local usedNames = {}
+        for _, bot in player.Iterator() do
+            if not bot:IsBot() then
+                continue
+            end
+
+            usedNames[bot:GetName()] = true
+        end
+
+        local availableNames = {}
+        for i = 1, #cachedBotNames do
+            if not usedNames[cachedBotNames[i]] then
+                availableNames[#availableNames + 1] = cachedBotNames[i]
+            end
+        end
+
+        if #availableNames > 0 then
+            name = availableNames[math.random(#availableNames)]
+        else
+            name = cachedBotNames[math.random(#cachedBotNames)]
+        end
+    end
     local model = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
     local bot = player.CreateNextBot(name)
 
