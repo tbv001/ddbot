@@ -51,15 +51,13 @@ local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
 local cv_AimPredictionEnabled = true
 local groundCheckOffset = Vector(0, 0, 58)
-local dirCheckHullMins = Vector(-13, -13, -13)
-local dirCheckHullMaxs = Vector(13, 13, 13)
 local supportQueue = {}
 local supportQueueLookup = {}
 local tempVector = Vector(0, 0, 0)
 local tempAngle = Angle(0, 0, 0)
 local targetVisTrace = {mask = MASK_VISIBLE}
 local propTrace = {mask = MASK_SHOT}
-local dirTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY}
+local dirTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13)}
 local doorTrace = {}
 
 
@@ -503,8 +501,6 @@ function DDBot.IsDirClear(bot, dir)
     
     dirTrace.start = center
     dirTrace.endpos = endPos
-    dirTrace.mins = dirCheckHullMins
-    dirTrace.maxs = dirCheckHullMaxs
     dirTrace.filter = filter
     local tr = util.TraceHull(dirTrace)
 
@@ -554,14 +550,6 @@ function DDBot.PlayerSpawn(bot)
     end
     
     if not cachedSpells then
-        local tempSpells = table.GetKeys(Spells)
-        cachedSpells = {}
-        for _, spell in ipairs(tempSpells) do
-            if spell ~= "barrier" then
-                cachedSpells[#cachedSpells + 1] = spell
-            end
-        end
-
         local tempPerks = table.GetKeys(Perks)
         cachedPerks = {}
         for _, perk in ipairs(tempPerks) do
@@ -570,6 +558,7 @@ function DDBot.PlayerSpawn(bot)
             end
         end
 
+        cachedSpells = table.GetKeys(Spells)
         cachedBuilds = table.GetKeys(Builds)
     end
     
