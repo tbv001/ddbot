@@ -180,7 +180,7 @@ cvars.AddChangeCallback("dd_bot_aim_spread_mult", function(convar_name, value_ol
 end)
 
 cvars.AddChangeCallback("dd_bot_fov", function(convar_name, value_old, value_new)
-    cv_FOVVal = math.cos(math.rad(tonumber(value_new) / 2))
+    cv_FOVVal = math.cos(math.rad(tonumber(value_new) * 0.5))
 end)
 
 
@@ -201,7 +201,7 @@ function DDBot.Init()
     cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
     cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
     cv_AimSpreadMult = cv_AimSpreadMult:GetFloat()
-    cv_FOVVal = math.cos(math.rad(cv_FOV:GetInt() / 2))
+    cv_FOVVal = math.cos(math.rad(cv_FOV:GetInt() * 0.5))
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -865,8 +865,6 @@ function DDBot.StartCommand(bot, cmd)
 
     if isOnLadder then
         buttons = buttons + IN_FORWARD
-    else
-        controller.CurrentLadderTime = curTime + 5
     end
 
     if not isSliding and not isOnLadder then
@@ -1220,7 +1218,14 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     local botShootPos = bot:GetShootPos()
-    if IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget < curTime) then
+    local traversingLadder = IsValid(curgoal.ladder)
+
+    if traversingLadder then
+        controller.CurrentLadder = curgoal.ladder
+        local targetAng = (goalpos - botShootPos):Angle()
+        resultingEyeAngle = targetAng
+        useAimSpeedMult = false
+    elseif IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget < curTime) then
         if inobjective and not melee then
             resultingForwardSpeed = 0
         end
@@ -1289,21 +1294,23 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
     end
 
-    if isOnLadder and IsValid(controller.CurrentLadder) and (controller.CurrentLadderTime > curTime and controller.StuckTime < 1.0) then
+    if isOnLadder and IsValid(controller.CurrentLadder) and controller.StuckTime < 1.0 then
         resultingForwardSpeed = maxSpeed
         resultingSideSpeed = 0
 
-        -- WIP; doesn't work well when top or bottom mesh center is not in the same direction with the ladder
         local ladder = controller.CurrentLadder
         local ladderTop = ladder:GetTop()
         local ladderBottom = ladder:GetBottom()
         local distToTop = cPos:DistToSqr(ladderTop)
         local distToBottom = cPos:DistToSqr(ladderBottom)
-        local targetPos = distToTop < distToBottom and ladderBottom or ladderTop
-        local lookAngle = (targetPos - botShootPos):Angle()
+        local centerLadderAngle = ((ladderTop + ladderBottom) * 0.5 - botShootPos):Angle()
+        local whichSide = distToTop < distToBottom and -1 or 1
+        local yAxis = whichSide * 30
+        local zAxis = centerLadderAngle.y + (whichSide == 1 and 180 or 0)
+        tempAngle.p, tempAngle.y, tempAngle.r = yAxis, zAxis, 0
         
-        resultingMoveAngle = lookAngle
-        resultingEyeAngle = lookAngle
+        resultingMoveAngle = tempAngle
+        resultingEyeAngle = tempAngle
         useAimSpeedMult = false
     elseif isOnLadder then
         bot:ExitLadder()

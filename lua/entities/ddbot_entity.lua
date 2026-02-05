@@ -53,7 +53,6 @@ function ENT:Initialize()
 	self.PendingTarget = nil
 	self.PendingProp = nil
 	self.PendingForceShootOff = false
-	self.CurrentLadderTime = 0
 end
 
 local function pathGenerator(ent, area, fromArea, ladder, elevator, length)
@@ -68,7 +67,6 @@ local function pathGenerator(ent, area, fromArea, ladder, elevator, length)
 
 		if (IsValid(ladder)) then
 			dist = ladder:GetLength()
-			ent.CurrentLadder = ladder
 		elseif (length > 0) then
 			dist = length
 		else
