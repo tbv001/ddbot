@@ -1225,7 +1225,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         local targetAng = (goalpos - botShootPos):Angle()
         resultingEyeAngle = targetAng
         useAimSpeedMult = false
-    elseif IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget < curTime) then
+    elseif IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget > curTime) then
         if inobjective and not melee then
             resultingForwardSpeed = 0
         end
