@@ -550,6 +550,14 @@ function DDBot.PlayerSpawn(bot)
     end
     
     if not cachedSpells then
+        local tempSpells = table.GetKeys(Spells)
+        cachedSpells = {}
+        for _, spell in ipairs(tempSpells) do
+            if spell ~= "telekinesis" then
+                cachedSpells[#cachedSpells + 1] = spell
+            end
+        end
+
         local tempPerks = table.GetKeys(Perks)
         cachedPerks = {}
         for _, perk in ipairs(tempPerks) do
@@ -558,7 +566,6 @@ function DDBot.PlayerSpawn(bot)
             end
         end
 
-        cachedSpells = table.GetKeys(Spells)
         cachedBuilds = table.GetKeys(Builds)
     end
     
