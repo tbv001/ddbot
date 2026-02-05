@@ -54,6 +54,7 @@ local groundCheckOffset = Vector(0, 0, 58)
 local dirCheckHullMins = Vector(-13, -13, -13)
 local dirCheckHullMaxs = Vector(13, 13, 13)
 local supportQueue = {}
+local supportQueueLookup = {}
 local tempVector = Vector(0, 0, 0)
 local tempAngle = Angle(0, 0, 0)
 local targetVisTrace = {mask = MASK_VISIBLE}
@@ -477,6 +478,11 @@ end
 
 function DDBot.GiveSupport(ply, target)
     if not IsValid(ply) or not IsValid(target) then return end
+    
+    local plyIdx = ply:EntIndex()
+    if supportQueueLookup[plyIdx] then return end
+    
+    supportQueueLookup[plyIdx] = true
     supportQueue[#supportQueue + 1] = {ply = ply, target = target}
 end
 
@@ -1460,6 +1466,8 @@ function DDBot.UpdateBots()
 
             shouldYield()
         end
+
+        supportQueueLookup[ply:EntIndex()] = nil
 
         shouldYield()
     end
