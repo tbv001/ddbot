@@ -50,6 +50,7 @@ local cv_CombatMovementEnabled = true
 local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
 local cv_AimPredictionEnabled = true
+local cv_AimSpreadMultVal = 1
 local groundCheckOffset = Vector(0, 0, 58)
 local supportQueue = {}
 local supportQueueLookup = {}
@@ -180,7 +181,7 @@ cvars.AddChangeCallback("dd_bot_aim_prediction", function(convar_name, value_old
 end)
 
 cvars.AddChangeCallback("dd_bot_aim_spread_mult", function(convar_name, value_old, value_new)
-    cv_AimSpreadMult = tonumber(value_new)
+    cv_AimSpreadMultVal = tonumber(value_new)
 end)
 
 cvars.AddChangeCallback("dd_bot_fov", function(convar_name, value_old, value_new)
@@ -204,7 +205,7 @@ function DDBot.Init()
     cv_CanUseGrenadesEnabled = cv_CanUseGrenades:GetBool()
     cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
     cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
-    cv_AimSpreadMult = cv_AimSpreadMult:GetFloat()
+    cv_AimSpreadMultVal = cv_AimSpreadMult:GetFloat()
     cv_FOVVal = math.cos(math.rad(cv_FOV:GetInt() * 0.5))
 
     if ents.FindByClass("prop_door_rotating")[1] then
@@ -1283,9 +1284,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
         local targetAng = (aimAtPos - botShootPos):Angle()
 
-        if cv_AimSpreadMult > 0 then
+        if cv_AimSpreadMultVal > 0 then
             tempAngle.p, tempAngle.y, tempAngle.r = math.Rand(-5, 5), math.Rand(-5, 5), 0
-            targetAng = targetAng + tempAngle * cv_AimSpreadMult
+            targetAng = targetAng + tempAngle * cv_AimSpreadMultVal
         end
 
         if controller.ForcedLookAt and controller.LookAtTime > curTime then
