@@ -1,6 +1,8 @@
 # Darkest Days Bots
 
-An addon for Garry's Mod that aims to provide challenging bots for the obscure Darkest Days game mode.
+An addon for Garry's Mod that aims to provide fully functional and challenging bots for the obscure Darkest Days game mode.
+
+[Steam Workshop Page](https://steamcommunity.com/sharedfiles/filedetails/?id=3661594184)
 
 ## Installation
 
