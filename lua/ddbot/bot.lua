@@ -1469,155 +1469,157 @@ local function shouldYield()
 end
 
 function DDBot.UpdateBots()
-    local curTime = CurTime()
+    while true do
+        local curTime = CurTime()
 
-    for _, bot in player.Iterator() do
-        if not bot:IsBot() then continue end
+        for _, bot in player.Iterator() do
+            if not bot:IsBot() then continue end
 
-        -- Spawn bot if spawn time has passed
-        if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < curTime then
-            bot:Spawn()
-        end
-
-        if not bot:Alive() then continue end
-
-        -- Refill ammo
-        local wep = bot:GetActiveWeapon()
-        if IsValid(wep) and wep.Primary then
-            local ammoty = wep:GetPrimaryAmmoType() or wep.Primary.Ammo
-            bot:SetAmmo(wep.Primary.DefaultClip, ammoty)
-        end
-
-        local controller = bot.ControllerBot
-        if not IsValid(controller) then continue end
-
-        local botPos = bot:GetPos()
-        local botTeam = bot:Team()
-
-        pooledTargetCount = 0
-
-        -- Check for targets
-        for _, ply in player.Iterator() do
-            if ply ~= bot and ply:Alive() then
-                local isEnemy = not isTeamPlay or ply:Team() ~= botTeam
-
-                if isEnemy then
-                    local distSqr = ply:GetPos():DistToSqr(botPos)
-                    if distSqr < 2250000 then
-                        pooledTargets[pooledTargetCount + 1] = ply
-                        pooledTargetDistances[ply] = distSqr
-                        pooledTargetCount = pooledTargetCount + 1
-                    end
-                end
+            -- Spawn bot if spawn time has passed
+            if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < curTime then
+                bot:Spawn()
             end
-            shouldYield()
-        end
 
-        for i = pooledTargetCount + 1, #pooledTargets do
-            pooledTargets[i] = nil
-        end
+            if not bot:Alive() then continue end
 
-        if pooledTargetCount > 1 then
-            table.sort(pooledTargets, DDBot.SortTargets)
-        end
-
-        local currentTargetDistSqr = IsValid(controller.Target) and botPos:DistToSqr(controller.Target:GetPos()) or math.huge
-        for i = 1, pooledTargetCount do
-            local ply = pooledTargets[i]
-            local isTargetVisible = DDBot.IsTargetVisible(bot, ply, controller.TraceFilter)
-            if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or currentTargetDistSqr > pooledTargetDistances[ply]) then
-                controller.PendingTarget = ply
-                break
-            end
-            shouldYield()
-        end
-
-        -- Prop and breakable checking
-        if not IsValid(controller.Target) and controller.NextPropCheck < curTime then
-            controller.NextPropCheck = curTime + 0.1
+            -- Refill ammo
             local wep = bot:GetActiveWeapon()
-            local melee = IsValid(wep) and wep.Base == "dd_meleebase"
-            local radiusCheck = melee and 50 or 100
-            local propsInRadius = ents.FindInSphere(botPos, radiusCheck)
-            local closestDist = math.huge
-            local closestProp
+            if IsValid(wep) and wep.Primary then
+                local ammoty = wep:GetPrimaryAmmoType() or wep.Primary.Ammo
+                bot:SetAmmo(wep.Primary.DefaultClip, ammoty)
+            end
 
-            for _, prop in ipairs(propsInRadius) do
-                local propClass = prop:GetClass()
-                if (string.StartsWith(propClass, "prop_") or propClass == "func_breakable") and prop:Health() > 0 then
-                    local explodeDamage = prop:GetKeyValues()["ExplodeDamage"]
-                    if explodeDamage and tonumber(explodeDamage) > 0 then
-                        continue
-                    end
+            local controller = bot.ControllerBot
+            if not IsValid(controller) then continue end
 
-                    local dist = botPos:DistToSqr(prop:GetPos())
-                    if dist < closestDist then
-                        closestDist = dist
-                        closestProp = prop
+            local botPos = bot:GetPos()
+            local botTeam = bot:Team()
+
+            pooledTargetCount = 0
+
+            -- Check for targets
+            for _, ply in player.Iterator() do
+                if ply ~= bot and ply:Alive() then
+                    local isEnemy = not isTeamPlay or ply:Team() ~= botTeam
+
+                    if isEnemy then
+                        local distSqr = ply:GetPos():DistToSqr(botPos)
+                        if distSqr < 2250000 then
+                            pooledTargets[pooledTargetCount + 1] = ply
+                            pooledTargetDistances[ply] = distSqr
+                            pooledTargetCount = pooledTargetCount + 1
+                        end
                     end
                 end
                 shouldYield()
             end
 
-            if closestProp and DDBot.IsTargetVisible(bot, closestProp, controller.TraceFilter) then
-                controller.PendingProp = closestProp
-            else
-                controller.PendingForceShootOff = true
+            for i = pooledTargetCount + 1, #pooledTargets do
+                pooledTargets[i] = nil
             end
-        end
 
-        shouldYield()
-    end
+            if pooledTargetCount > 1 then
+                table.sort(pooledTargets, DDBot.SortTargets)
+            end
 
-    -- Process support queue
-    local canSetPos = gameType ~= "koth" and gameType ~= "htf"
-    local queueCount = #supportQueue
-    for i = 1, queueCount do
-        local request = table.remove(supportQueue, 1)
-        if not request then break end
+            local currentTargetDistSqr = IsValid(controller.Target) and botPos:DistToSqr(controller.Target:GetPos()) or math.huge
+            for i = 1, pooledTargetCount do
+                local ply = pooledTargets[i]
+                local isTargetVisible = DDBot.IsTargetVisible(bot, ply, controller.TraceFilter)
+                if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or currentTargetDistSqr > pooledTargetDistances[ply]) then
+                    controller.PendingTarget = ply
+                    break
+                end
+                shouldYield()
+            end
 
-        local ply = request.ply
-        local target = request.target
+            -- Prop and breakable checking
+            if not IsValid(controller.Target) and controller.NextPropCheck < curTime then
+                controller.NextPropCheck = curTime + 0.1
+                local wep = bot:GetActiveWeapon()
+                local melee = IsValid(wep) and wep.Base == "dd_meleebase"
+                local radiusCheck = melee and 50 or 100
+                local propsInRadius = ents.FindInSphere(botPos, radiusCheck)
+                local closestDist = math.huge
+                local closestProp
 
-        if not IsValid(ply) or not IsValid(target) then continue end
+                for _, prop in ipairs(propsInRadius) do
+                    local propClass = prop:GetClass()
+                    if (string.StartsWith(propClass, "prop_") or propClass == "func_breakable") and prop:Health() > 0 then
+                        local explodeDamage = prop:GetKeyValues()["ExplodeDamage"]
+                        if explodeDamage and tonumber(explodeDamage) > 0 then
+                            continue
+                        end
 
-        local plyPos = ply:GetPos()
-        local plyTeam = ply.Team and ply:Team()
-        local targetPos = target:GetPos()
-        local targetCenter = target:WorldSpaceCenter()
-
-        for _, bot in ipairs(player.GetBots()) do
-            if bot == ply or not IsValid(bot) then continue end
-
-            local controller = bot.ControllerBot
-            if not IsValid(controller) then continue end
-
-            if plyTeam and bot.Team and bot:Team() ~= plyTeam then continue end
-
-            local isVisible = bot:VisibleVec(ply:EyePos())
-            if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then continue end
-
-            if not IsValid(controller.Target) then
-                if canSetPos then
-                    controller.PosGen:Set(targetPos)
-                    controller.LastSegmented = curTime + 5
+                        local dist = botPos:DistToSqr(prop:GetPos())
+                        if dist < closestDist then
+                            closestDist = dist
+                            closestProp = prop
+                        end
+                    end
+                    shouldYield()
                 end
 
-                if isVisible then
-                    controller.LookAt:Set(targetCenter)
-                    controller.LookAtTime = curTime + 1
+                if closestProp and DDBot.IsTargetVisible(bot, closestProp, controller.TraceFilter) then
+                    controller.PendingProp = closestProp
+                else
+                    controller.PendingForceShootOff = true
                 end
             end
 
             shouldYield()
         end
 
-        supportQueueLookup[ply:EntIndex()] = nil
+        -- Process support queue
+        local canSetPos = gameType ~= "koth" and gameType ~= "htf"
+        local queueCount = #supportQueue
+        for i = 1, queueCount do
+            local request = table.remove(supportQueue, 1)
+            if not request then break end
 
-        shouldYield()
+            local ply = request.ply
+            local target = request.target
+
+            if not IsValid(ply) or not IsValid(target) then continue end
+
+            local plyPos = ply:GetPos()
+            local plyTeam = ply.Team and ply:Team()
+            local targetPos = target:GetPos()
+            local targetCenter = target:WorldSpaceCenter()
+
+            for _, bot in ipairs(player.GetBots()) do
+                if bot == ply or not IsValid(bot) then continue end
+
+                local controller = bot.ControllerBot
+                if not IsValid(controller) then continue end
+
+                if plyTeam and bot.Team and bot:Team() ~= plyTeam then continue end
+
+                local isVisible = bot:VisibleVec(ply:EyePos())
+                if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then continue end
+
+                if not IsValid(controller.Target) then
+                    if canSetPos then
+                        controller.PosGen:Set(targetPos)
+                        controller.LastSegmented = curTime + 5
+                    end
+
+                    if isVisible then
+                        controller.LookAt:Set(targetCenter)
+                        controller.LookAtTime = curTime + 1
+                    end
+                end
+
+                shouldYield()
+            end
+
+            supportQueueLookup[ply:EntIndex()] = nil
+
+            shouldYield()
+        end
+
+        coroutine.yield()
     end
-
-    coroutine.yield()
 end
 
 
