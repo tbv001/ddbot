@@ -639,7 +639,6 @@ Avery
 Loyd
 Diego
 Alexis
-Adolph
 Norris
 Millard
 Rocco
@@ -718,7 +717,6 @@ Delmar
 Johnathon
 Silas
 Frederic
-Dick
 Kirby
 Irwin
 Cruz
@@ -786,7 +784,6 @@ Bennett
 Octavio
 Cornell
 Laverne
-Hung
 Arron
 Antony
 Herschel
@@ -1062,7 +1059,6 @@ Otha
 Miquel
 Lacy
 Eusebio
-Dong
 Domenic
 Darron
 Buster
@@ -1138,7 +1134,6 @@ Modesto
 Francesco
 Manual
 Jae
-Gaylord
 Gaston
 Filiberto
 Deangelo
