@@ -1460,16 +1460,16 @@ local processingLimit = 100
 local curProcessing = 0
 local updateCoroutine = nil
 
+local function shouldYield()
+    curProcessing = curProcessing + 1
+    if curProcessing >= processingLimit then
+        curProcessing = 0
+        coroutine.yield()
+    end
+end
+
 function DDBot.UpdateBots()
     local curTime = CurTime()
-
-    local function shouldYield()
-        curProcessing = curProcessing + 1
-        if curProcessing >= processingLimit then
-            curProcessing = 0
-            coroutine.yield()
-        end
-    end
 
     for _, bot in player.Iterator() do
         if not bot:IsBot() then continue end
