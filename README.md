@@ -28,6 +28,7 @@ git clone https://github.com/tbv001/ddbot.git
 ## Credits
 
 - [LeadKiller](https://github.com/LeadKiller), the original author of LeadBot.
+- [ExtReMLapin](https://github.com/ExtReMLapin), LeadBot contributor.
 
 ## License
 
