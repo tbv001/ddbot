@@ -1514,10 +1514,6 @@ function DDBot.UpdateBots()
                 shouldYield()
             end
 
-            for i = pooledTargetCount + 1, #pooledTargets do
-                pooledTargets[i] = nil
-            end
-
             if pooledTargetCount > 1 then
                 table.sort(pooledTargets, DDBot.SortTargets)
             end
@@ -1531,6 +1527,11 @@ function DDBot.UpdateBots()
                     break
                 end
                 shouldYield()
+            end
+
+            for i = 1, pooledTargetCount do
+                pooledTargetDistances[pooledTargets[i]] = nil
+                pooledTargets[i] = nil
             end
 
             -- Prop and breakable checking
