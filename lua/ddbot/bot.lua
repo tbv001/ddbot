@@ -111,7 +111,7 @@ concommand.Add("dd_bot_kick", function(ply, _, args)
         return
     end
 
-    if args[1] and args[1] ~= "all" then
+    if args[1] then
         for k, v in pairs(player.GetBots()) do
             if string.find(v:GetName(), args[1]) then
                 v:Kick()
