@@ -51,7 +51,6 @@ function ENT:Initialize()
 	self.StuckTime = 0
 	self.StuckStrafeDir = 1
 	self.NextStuckStrafe = 0
-	self.CurrentLadder = nil
 	self.PendingTarget = nil
 	self.PendingProp = nil
 	self.PendingForceShootOff = false

@@ -800,10 +800,9 @@ function DDBot.StartCommand(bot, cmd)
     local isAlreadyAttacking = false
     local isAlreadyCasting = false
     local isSliding = false
-    local isOnLadder = bot:GetMoveType() == MOVETYPE_LADDER
 
     -- Sprint when not casting spells and not about to throw nade
-    if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade and not isOnLadder then
+    if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade then
         buttons = IN_SPEED
     end
 
@@ -904,11 +903,7 @@ function DDBot.StartCommand(bot, cmd)
         end
     end
 
-    if isOnLadder then
-        buttons = buttons + IN_FORWARD
-    end
-
-    if not isSliding and not isOnLadder then
+    if not isSliding then
         if controller.NextDuck > curTime then
             buttons = buttons + IN_DUCK
         elseif controller.NextJump == 0 then
@@ -938,7 +933,6 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local backingUp = false
     local combatMovement = false
     local useAimSpeedMult = false
-    local isOnLadder = bot:GetMoveType() == MOVETYPE_LADDER
     local visibleTargetPos
 
     if not IsValid(controller) then
@@ -1288,17 +1282,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     local botShootPos = bot:GetShootPos()
-    local traversingLadder = IsValid(curgoal.ladder)
 
-    if traversingLadder then
-        controller.CurrentLadder = curgoal.ladder
-        -- local targetAng = (goalpos - botShootPos):Angle()
-        tempVector:Set(goalpos)
-        tempVector:Sub(botShootPos)
-        local targetAng = tempVector:Angle()
-        resultingEyeAngle = targetAng
-        useAimSpeedMult = false
-    elseif IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget > curTime) then
+    if IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget > curTime) then
         if inobjective and not melee then
             resultingForwardSpeed = 0
         end
@@ -1391,37 +1376,6 @@ function DDBot.PlayerMove(bot, cmd, mv)
         else
             resultingEyeAngle = mva
         end
-    end
-
-    if isOnLadder and IsValid(controller.CurrentLadder) and controller.StuckTime < 1.0 then
-        resultingForwardSpeed = maxSpeed
-        resultingSideSpeed = 0
-
-        local ladder = controller.CurrentLadder
-        local ladderTop = ladder:GetTop()
-        local ladderBottom = ladder:GetBottom()
-        local distToTop = cPos:DistToSqr(ladderTop)
-        local distToBottom = cPos:DistToSqr(ladderBottom)
-        local centerLadderAngle
-        
-        -- local centerLadderAngle = ((ladderTop + ladderBottom) * 0.5 - botShootPos):Angle()
-        tempVector:Set(ladderTop)
-        tempVector:Add(ladderBottom)
-        tempVector:Mul(0.5)
-        tempVector:Sub(botShootPos)
-        
-        centerLadderAngle = tempVector:Angle()
-
-        local whichSide = distToTop < distToBottom and -1 or 1
-        local yAxis = whichSide * 30
-        local zAxis = centerLadderAngle.y + (whichSide == 1 and 180 or 0)
-        tempAngle:SetUnpacked(yAxis, zAxis, 0)
-        
-        resultingMoveAngle = tempAngle
-        resultingEyeAngle = tempAngle
-        useAimSpeedMult = false
-    elseif isOnLadder then
-        bot:ExitLadder()
     end
 
     local lerpResult = useAimSpeedMult and lerp or lerpc
