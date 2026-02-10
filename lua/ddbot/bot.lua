@@ -1254,7 +1254,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         if controller.StuckTime >= 0.5 then
             if controller.NextStuckStrafe < curTime then
                 controller.StuckStrafeDir = controller.StuckStrafeDir == 1 and -1 or 1
-                controller.NextStuckStrafe = curTime + math.Rand(0.3, 0.65)
+                controller.NextStuckStrafe = curTime + math.Rand(1, 2)
             end
 
             if controller.nextStuckJump < curTime then
