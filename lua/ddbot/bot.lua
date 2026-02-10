@@ -848,7 +848,7 @@ function DDBot.StartCommand(bot, cmd)
             bot:SwitchSpell()
         end
 
-        if cv_CanUseSpellsEnabled and controller.NextAttack2Delay < curTime and (curSpell and bot.CanCast and bot:CanCast(curSpell)) and math.random(3) == 1 and not isUsingMinigun and not isThug then
+        if cv_CanUseSpellsEnabled and controller.NextAttack2Delay < curTime and (curSpell and bot.CanCast and bot:CanCast(curSpell)) and math.random(3) == 1 and not isUsingMinigun and not isThug and not isOnLadder then
             if isTargetValid then
                 local nextAttack2Time = melee and 1 or 2
                 controller.NextAttack2 = curTime + nextAttack2Time
