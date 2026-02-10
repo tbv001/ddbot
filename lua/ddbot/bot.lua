@@ -643,7 +643,7 @@ function DDBot.PlayerSpawn(bot)
         local tempSpells = table.GetKeys(Spells)
         cachedSpells = {}
         for _, spell in ipairs(tempSpells) do
-            if spell ~= "telekinesis" then
+            if spell ~= "telekinesis" and spell ~= "bloodtrap" and spell ~= "cyclonetrap" then
                 cachedSpells[#cachedSpells + 1] = spell
             end
         end
