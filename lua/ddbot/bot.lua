@@ -1608,7 +1608,11 @@ function DDBot.ProcessSupportQueue()
             local targetPos = target:GetPos()
             local targetCenter = target:WorldSpaceCenter()
 
-            for _, bot in ipairs(player.GetBots()) do
+            local bots = player.GetBots()
+            local numBots = #bots
+
+            for i = 1, numBots do
+                local bot = bots[i]
                 if bot == ply or not IsValid(bot) then continue end
 
                 local controller = bot.ControllerBot
