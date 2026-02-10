@@ -869,12 +869,14 @@ function DDBot.StartCommand(bot, cmd)
                 end
                 controller.LookAtTime = curTime + 0.1
                 controller.NextAttack2 = curTime + 0.1
+                controller.NextAttack2Delay = curTime + math.random(5, 10)
                 controller.ForcedLookAt = true
                 controller.ForceCast = true
             elseif spellClass == "spell_cyclonetrap" then
                 controller.LookAt:Set(botPos)
                 controller.LookAtTime = curTime + 0.1
                 controller.NextAttack2 = curTime + 0.1
+                controller.NextAttack2Delay = curTime + math.random(5, 10)
                 controller.ForcedLookAt = true
                 controller.ForceCast = true
             elseif spellClass == "spell_bloodtrap" then
@@ -882,6 +884,7 @@ function DDBot.StartCommand(bot, cmd)
                 controller.LookAt.z = controller.LookAt.z + 1000
                 controller.LookAtTime = curTime + 0.1
                 controller.NextAttack2 = curTime + 0.1
+                controller.NextAttack2Delay = curTime + math.random(5, 10)
                 controller.ForcedLookAt = true
                 controller.ForceCast = true
             end
