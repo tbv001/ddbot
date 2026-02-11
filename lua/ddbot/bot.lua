@@ -152,8 +152,23 @@ concommand.Add("dd_bot_generatenavmesh", function(ply, _, args)
     ply:ConCommand("nav_max_view_distance 1")
     ply:ConCommand("nav_quicksave 2")
 
-    if ply:Alive() then
-        ply:ConCommand("nav_mark_walkable")
+    local spawnEnts = ents.FindByClass("info_player_*")
+    local numSpawnEnts = #spawnEnts
+    local trData = {MASK = MASK_PLAYERSOLID_BRUSHONLY}
+
+    for i = 1, numSpawnEnts do
+        local ent = spawnEnts[i]
+        if not IsValid(ent) then continue end
+
+        trData.start = ent:GetPos()
+        trData.endpos = trData.start - Vector(0, 0, 100)
+
+        local tr = util.TraceLine(trData)
+        if tr.Hit then
+            navmesh.AddWalkableSeed(tr.HitPos, tr.HitNormal)
+        else
+            navmesh.AddWalkableSeed(trData.start, Vector(0, 0, 1))
+        end
     end
 
     ply:ConCommand("nav_generate")
