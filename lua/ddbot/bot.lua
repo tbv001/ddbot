@@ -697,6 +697,7 @@ function DDBot.PlayerSpawn(bot)
     bot.Skills["strength"] = 0
     bot.Skills["magic"] = 5
     bot.Skills["agility"] = 15
+    bot.IsMagicLoadout = false
 
     if loadoutType == 3 then
         primary = "dd_sparkler"
@@ -706,6 +707,7 @@ function DDBot.PlayerSpawn(bot)
         bot.Skills["strength"] = 0
         bot.Skills["magic"] = 15
         bot.Skills["agility"] = 5
+        bot.IsMagicLoadout = true
     elseif loadoutType == 4 and not zombies then
         local thugOrNot = math.random(5) == 1 and "thug" or "adrenaline"
         primary = "none"
@@ -863,11 +865,17 @@ function DDBot.StartCommand(bot, cmd)
             bot:SwitchSpell()
         end
 
-        if cv_CanUseSpellsEnabled and controller.NextAttack2Delay < curTime and (curSpell and bot.CanCast and bot:CanCast(curSpell)) and math.random(3) == 1 and not isUsingMinigun and not isThug and not isOnLadder then
+        if cv_CanUseSpellsEnabled and controller.NextAttack2Delay < curTime and (curSpell and bot.CanCast and bot:CanCast(curSpell)) and (bot.IsMagicLoadout or math.random(3) == 1) and not isUsingMinigun and not isThug and not isOnLadder then
+            local nextAttack2Delay = bot.IsMagicLoadout and math.random(1, 3) or math.random(5, 10)
+
+            if bot.IsMagicLoadout then
+                print("Magic Loadout")
+            end
+            
             if isTargetValid then
-                local nextAttack2Time = melee and 1 or 2
+                local nextAttack2Time = melee and 1 or bot.IsMagicLoadout and 3 or 2
                 controller.NextAttack2 = curTime + nextAttack2Time
-                controller.NextAttack2Delay = curTime + math.random(5, 10)
+                controller.NextAttack2Delay = curTime + nextAttack2Delay
             end
 
             local spellClass = curSpell:GetClass()
@@ -884,14 +892,14 @@ function DDBot.StartCommand(bot, cmd)
                 end
                 controller.LookAtTime = curTime + 0.1
                 controller.NextAttack2 = curTime + 0.1
-                controller.NextAttack2Delay = curTime + math.random(5, 10)
+                controller.NextAttack2Delay = curTime + nextAttack2Delay
                 controller.ForcedLookAt = true
                 controller.ForceCast = true
             elseif spellClass == "spell_cyclonetrap" then
                 controller.LookAt:Set(botPos)
                 controller.LookAtTime = curTime + 0.1
                 controller.NextAttack2 = curTime + 0.1
-                controller.NextAttack2Delay = curTime + math.random(5, 10)
+                controller.NextAttack2Delay = curTime + nextAttack2Delay
                 controller.ForcedLookAt = true
                 controller.ForceCast = true
             elseif spellClass == "spell_bloodtrap" then
@@ -899,7 +907,7 @@ function DDBot.StartCommand(bot, cmd)
                 controller.LookAt.z = controller.LookAt.z + 1000
                 controller.LookAtTime = curTime + 0.1
                 controller.NextAttack2 = curTime + 0.1
-                controller.NextAttack2Delay = curTime + math.random(5, 10)
+                controller.NextAttack2Delay = curTime + nextAttack2Delay
                 controller.ForcedLookAt = true
                 controller.ForceCast = true
             end
