@@ -556,7 +556,7 @@ function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetA
     tempVector:Mul(timeToHit)
     tempVector:Add(targetPos)
 
-    return Vector(tempVector.x, tempVector.y, tempVector.z)
+    return tempVector
 end
 
 function DDBot.FindRandomSpot(bot)
