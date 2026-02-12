@@ -701,7 +701,7 @@ function DDBot.PlayerSpawn(bot)
         cachedBuilds = table.GetKeys(Builds)
     end
     
-    local loadoutType = math.random(1, 4)
+    local loadoutType = 4 --math.random(1, 4)
     local spell1 = cachedSpells[math.random(#cachedSpells)]
     local spell2 = cachedSpells[math.random(#cachedSpells)]
     if #cachedSpells > 1 then
@@ -853,7 +853,7 @@ function DDBot.StartCommand(bot, cmd)
         buttons = IN_FORWARD
     else
         -- Sprint when not casting spells and not about to throw nade
-        if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade then
+        if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade and not controller.MeleeBlocking then
             buttons = IN_SPEED
         end
 
@@ -930,6 +930,10 @@ function DDBot.StartCommand(bot, cmd)
             end
         end
 
+        if controller.MeleeStateTimer < curTime and controller.MeleeBlocking then
+            controller.MeleeBlocking = false
+        end
+
         if isTargetValid then
             local targetCenter = target:WorldSpaceCenter()
             if ((isUsingMinigun or DDBot.IsPosWithinFOV(bot, targetCenter)) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and (isUsingMinigun or isTargetVisible)) or isCurrentlyCharging then
@@ -945,13 +949,34 @@ function DDBot.StartCommand(bot, cmd)
                 local inMeleeRange = not melee or wantsToCharge or botPos:DistToSqr(target:GetPos()) < 10000
                 if inMeleeRange then
                     local attack2 = (wantsToCharge or (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime)) and IN_ATTACK2 or 0
-                    buttons = buttons + (wantsToCharge and 0 or IN_ATTACK) + attack2
+                    
+                    local attackButton = IN_ATTACK
+                    if melee and not zombies then
+                        if controller.MeleeStateTimer < curTime and math.random(3) == 1 then
+                            controller.MeleeBlocking = not controller.MeleeBlocking
+                            controller.MeleeStateTimer = curTime + math.Rand(1, 2)
+                        end
+
+                        if controller.MeleeBlocking then
+                            attackButton = IN_RELOAD
+                            attack2 = 0
+                        end
+                    else
+                        controller.MeleeBlocking = false
+                        controller.MeleeStateTimer = 0
+                    end
+
+                    buttons = buttons + (wantsToCharge and 0 or attackButton) + attack2
                     isAlreadyCasting = attack2 > 0
                     isAlreadyAttacking = true
 
-                    if not isUsingMinigun and not isThug then
+                    if not isUsingMinigun and not isThug and not (melee and controller.MeleeBlocking) then
                         controller.NextAttack = curTime + 0.05
                     end
+                elseif melee and not isThug then
+                    buttons = buttons + IN_RELOAD
+                    controller.MeleeStateTimer = curTime + 0.1
+                    controller.MeleeBlocking = true
                 end
 
                 -- Dive
