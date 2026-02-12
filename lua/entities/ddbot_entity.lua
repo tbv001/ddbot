@@ -43,6 +43,8 @@ function ENT:Initialize()
 	self.NextSlideTime = 0
 	self.CurSlideTime = 0
 	self.NextNadeThrowTime = 0
+	self.ChargeAttackTime = 0
+	self.ChargeAttackDelay = 0
 	self.ForceShoot = false
 	self.ForceCast = false
 	self.NextPropCheck = 0

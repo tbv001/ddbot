@@ -62,6 +62,7 @@ local tempAngle = Angle(0, 0, 0)
 local targetVisTrace = {mask = MASK_VISIBLE}
 local propTrace = {mask = MASK_SHOT}
 local dirTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13)}
+local ramTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13)}
 local doorTrace = {}
 local cachedBotNames
 local explosiveCache = {}
@@ -630,6 +631,13 @@ function DDBot.SortTargets(a, b)
     return pooledTargetDistances[a] < pooledTargetDistances[b]
 end
 
+function DDBot.RamCheck(v1, v2)
+    ramTrace.start = v1
+    ramTrace.endpos = v2
+    local tr = util.TraceHull(ramTrace)
+    return not tr.Hit
+end
+
 
 --[[----------------------------
     Hook Functions
@@ -821,6 +829,9 @@ function DDBot.StartCommand(bot, cmd)
     local isTargetValid = IsValid(target)
     local isTargetVisible = isTargetValid and DDBot.IsTargetVisible(bot, target, controller.TraceFilter)
     local isThug = bot:IsThug()
+    local wantsToCharge = isThug and controller.ChargeAttackTime > curTime
+    local isCurrentlyCharging = isThug and botWeaponValid and ((botWeapon.IsCharging and botWeapon:IsCharging()) or (botWeapon.IsChargeAttacking and botWeapon:IsChargeAttacking()))
+    local isChargingCheck = isThug and controller.ChargeAttackTime < curTime + 4
     local aboutToThrowNade = cv_CanUseGrenadesEnabled and bot.Skills.agility == 15 and isTargetVisible and controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
     local curSpell = bot.GetCurrentSpell and bot:GetCurrentSpell()
     local isAlreadyAttacking = false
@@ -911,15 +922,24 @@ function DDBot.StartCommand(bot, cmd)
 
         if isTargetValid then
             local targetCenter = target:WorldSpaceCenter()
-            if (isUsingMinigun or DDBot.IsPosWithinFOV(bot, targetCenter)) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and (isUsingMinigun or isTargetVisible) then
-                local inMeleeRange = not melee or botPos:DistToSqr(target:GetPos()) < 10000
+            if ((isUsingMinigun or DDBot.IsPosWithinFOV(bot, targetCenter)) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and (isUsingMinigun or isTargetVisible)) or isCurrentlyCharging then
+                if isThug and controller.ChargeAttackTime < curTime and controller.ChargeAttackDelay < curTime then
+                    if DDBot.RamCheck(bot:WorldSpaceCenter(), targetCenter) then
+                        controller.ChargeAttackTime = curTime + 5
+                        controller.ChargeAttackDelay = curTime + math.random(10, 20)
+                    else
+                        controller.ChargeAttackDelay = curTime + 1
+                    end
+                end
+
+                local inMeleeRange = not melee or wantsToCharge or botPos:DistToSqr(target:GetPos()) < 10000
                 if inMeleeRange then
-                    local attack2 = (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime) and IN_ATTACK2 or 0
-                    buttons = buttons + IN_ATTACK + attack2
+                    local attack2 = (wantsToCharge or (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime)) and IN_ATTACK2 or 0
+                    buttons = buttons + (wantsToCharge and 0 or IN_ATTACK) + attack2
                     isAlreadyCasting = attack2 > 0
                     isAlreadyAttacking = true
 
-                    if not isUsingMinigun then
+                    if not isUsingMinigun and not isThug then
                         controller.NextAttack = curTime + 0.05
                     end
                 end
@@ -940,6 +960,10 @@ function DDBot.StartCommand(bot, cmd)
             controller.ShootReactionTime = curTime + math.Rand(0.25, 0.5)
         end
 
+        if wantsToCharge and isChargingCheck and not isCurrentlyCharging then
+            controller.ChargeAttackTime = 0
+        end
+
         if not isAlreadyAttacking and controller.NextAttack < curTime and controller.ForceShoot then
             buttons = buttons + IN_ATTACK
 
@@ -955,7 +979,7 @@ function DDBot.StartCommand(bot, cmd)
         end
     end
 
-    if not isSliding and not isOnLadder then
+    if not isSliding and not isOnLadder and not wantsToCharge then
         if controller.NextDuck > curTime then
             buttons = buttons + IN_DUCK
         elseif controller.NextJump == 0 then
@@ -995,10 +1019,11 @@ function DDBot.PlayerMove(bot, cmd, mv)
         bot.ControllerBot.TraceFilter[2] = bot.ControllerBot
         controller = bot.ControllerBot
     end
-
+    
     local wep = bot:GetActiveWeapon()
     local botPos = bot:GetPos()
     local curTime = CurTime()
+    local isCurrentlyCharging = bot:IsThug() and IsValid(wep) and (wep.IsChargeAttacking and wep:IsChargeAttacking())
 
     local controllerPos = controller:GetPos()
     if controllerPos ~= botPos then
@@ -1043,6 +1068,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
         controller.ForceShoot = false
         controller.PendingForceShootOff = nil
     end
+
+    if isCurrentlyCharging then return end
 
     if doorEnabled then
         local dt = util.QuickTrace(bot:EyePos(), bot:GetForward() * 45, controller.TraceFilter)
