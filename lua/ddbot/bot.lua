@@ -946,10 +946,10 @@ function DDBot.StartCommand(bot, cmd)
                     end
                 end
 
-                local inMeleeRange = not melee or wantsToCharge or botPos:DistToSqr(target:GetPos()) < 10000
+                local targetDist = botPos:DistToSqr(target:GetPos())
+                local attack2 = (wantsToCharge or (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime)) and IN_ATTACK2 or 0
+                local inMeleeRange = not melee or wantsToCharge or targetDist < 10000
                 if inMeleeRange then
-                    local attack2 = (wantsToCharge or (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime)) and IN_ATTACK2 or 0
-                    
                     local attackButton = IN_ATTACK
                     if melee and not zombies then
                         if controller.MeleeStateTimer < curTime and math.random(3) == 1 then
@@ -974,9 +974,15 @@ function DDBot.StartCommand(bot, cmd)
                         controller.NextAttack = curTime + 0.05
                     end
                 elseif melee and not isThug then
-                    buttons = buttons + IN_RELOAD
-                    controller.MeleeStateTimer = curTime + 0.1
-                    controller.MeleeBlocking = true
+                    if attack2 > 0 then
+                        buttons = buttons + attack2
+                        isAlreadyCasting = true
+                        controller.MeleeBlocking = false
+                    elseif targetDist < 250000 then
+                        buttons = buttons + IN_RELOAD
+                        controller.MeleeBlocking = true
+                        controller.MeleeStateTimer = curTime + 0.1
+                    end
                 end
 
                 -- Dive
