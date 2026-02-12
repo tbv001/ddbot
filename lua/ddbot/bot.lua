@@ -118,7 +118,7 @@ concommand.Add("dd_bot_kick", function(ply, _, args)
     if name then
         local bots = player.GetBots()
         for i = 1, #bots do
-            if string.find(bots[i]:GetName(), name) then
+            if string.find(bots[i]:GetName(), name, 1, true) then
                 bots[i]:Kick()
                 cv_Quota:SetInt(math.max(0, #player.GetBots() + #player.GetHumans() - 1))
                 return
@@ -158,7 +158,7 @@ concommand.Add("dd_bot_generatenavmesh", function(ply, _, args)
 
     local spawnEnts = ents.FindByClass("info_player_*")
     local numSpawnEnts = #spawnEnts
-    local trData = {MASK = MASK_PLAYERSOLID_BRUSHONLY}
+    local trData = {mask = MASK_PLAYERSOLID_BRUSHONLY}
 
     for i = 1, numSpawnEnts do
         local ent = spawnEnts[i]
@@ -556,7 +556,7 @@ function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetA
     tempVector:Mul(timeToHit)
     tempVector:Add(targetPos)
 
-    return tempVector
+    return Vector(tempVector.x, tempVector.y, tempVector.z)
 end
 
 function DDBot.FindRandomSpot(bot)
@@ -1189,10 +1189,10 @@ function DDBot.PlayerMove(bot, cmd, mv)
             if bot:IsThug() then
                 local closestEnemy = DDBot.GetClosestPlayer(bot, false)
                 if IsValid(closestEnemy) then
-                    controller.PosGen = closestEnemy:GetPos()
+                    controller.PosGen:Set(closestEnemy:GetPos())
                     controller.LastSegmented = curTime + 2
                 else
-                    controller.PosGen = DDBot.FindRandomSpot(bot)
+                    controller.PosGen:Set(DDBot.FindRandomSpot(bot))
                     controller.LastSegmented = curTime + 10
                 end
             else
@@ -1210,7 +1210,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
                     controller.LastSegmented = curTime + 2
                 else
-                    controller.PosGen = DDBot.FindRandomSpot(bot)
+                    controller.PosGen:Set(DDBot.FindRandomSpot(bot))
                     controller.LastSegmented = curTime + 10
                 end
             end
