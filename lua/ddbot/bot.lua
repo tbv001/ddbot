@@ -40,6 +40,7 @@ local gameType
 local doorEnabled
 local cachedPrimaries, cachedSecondaries
 local cachedSpells, cachedPerks, cachedBuilds
+local cachedModels
 local cv_QuotaVal = 0
 local cv_AimSpeedMultVal = 1
 local cv_FOVVal = math.cos(math.rad(50))
@@ -115,16 +116,18 @@ concommand.Add("dd_bot_kick", function(ply, _, args)
 
     local name = #args > 0 and table.concat(args, " ") or nil
     if name then
-        for k, v in pairs(player.GetBots()) do
-            if string.find(v:GetName(), name) then
-                v:Kick()
+        local bots = player.GetBots()
+        for i = 1, #bots do
+            if string.find(bots[i]:GetName(), name) then
+                bots[i]:Kick()
                 cv_Quota:SetInt(math.max(0, #player.GetBots() + #player.GetHumans() - 1))
                 return
             end
         end
     else
-        for k, v in pairs(player.GetBots()) do
-            v:Kick()
+        local bots = player.GetBots()
+        for i = 1, #bots do
+            bots[i]:Kick()
         end
         cv_Quota:SetInt(0)
     end
@@ -302,7 +305,24 @@ function DDBot.AddBot(customName)
             name = cachedBotNames[math.random(#cachedBotNames)]
         end
     end
-    local model = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
+
+    if not cachedModels then
+        cachedModels = {}
+        local blacklistSet = {}
+        if GAMEMODE.ModelBlacklist then
+            for i = 1, #GAMEMODE.ModelBlacklist do
+                blacklistSet[GAMEMODE.ModelBlacklist[i]] = true
+            end
+        end
+        for _, model in pairs(player_manager.AllValidModels()) do
+            local modelPath = string.lower(player_manager.TranslatePlayerModel(model))
+            if not blacklistSet[modelPath] then
+                cachedModels[#cachedModels + 1] = model
+            end
+        end
+    end
+
+    local model = table.Random(cachedModels)
     local bot = player.CreateNextBot(name)
 
     if not IsValid(bot) then
@@ -373,15 +393,15 @@ function DDBot.IsTargetVisible(bot, target, ignore)
     local targetCenter = target:WorldSpaceCenter()
     local botEyePos = bot:EyePos()
 
+    if target.IsGhosting and target:IsGhosting() then
+        return nil
+    end
+
     if botEyePos:DistToSqr(targetCenter) > 2500 then 
         -- Field of view check
         if not DDBot.IsPosWithinFOV(bot, targetCenter) then
             return nil
         end
-    end
-
-    if target.IsGhosting and target:IsGhosting() then
-        return nil
     end
 
     -- For props
@@ -394,19 +414,18 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         return tr.Entity == target and targetCenter or nil
     end
 
-    local targetEyePos = target:EyePos()
     targetVisTrace.start = botEyePos
-    targetVisTrace.endpos = targetEyePos
     targetVisTrace.filter = ignore
+
+    local targetEyePos = target:EyePos()
+    targetVisTrace.endpos = targetEyePos
     local tr = util.TraceLine(targetVisTrace)
 
     if not tr.Hit then
         return targetEyePos
     end
 
-    targetVisTrace.start = botEyePos
     targetVisTrace.endpos = targetCenter
-    targetVisTrace.filter = ignore
     local tr2 = util.TraceLine(targetVisTrace)
 
     if not tr2.Hit then
@@ -414,9 +433,7 @@ function DDBot.IsTargetVisible(bot, target, ignore)
     end
 
     local targetPos = target:GetPos()
-    targetVisTrace.start = botEyePos
     targetVisTrace.endpos = targetPos
-    targetVisTrace.filter = ignore
     local tr3 = util.TraceLine(targetVisTrace)
 
     if not tr3.Hit then
@@ -489,26 +506,24 @@ end
 function DDBot.GetLeader(bot)
     if not IsValid(bot) then return nil end
 
-    local potentialLeaders = {}
+    local bestLeader = nil
+    local bestIsHuman = false
+    local bestIdx = math.huge
+    local botTeam = bot:Team()
 
     for _, ply in player.Iterator() do
-        if ply:Alive() and ply:Team() == bot:Team() then
-            potentialLeaders[#potentialLeaders + 1] = ply
+        if ply:Alive() and ply:Team() == botTeam then
+            local isHuman = not ply:IsBot()
+            local idx = ply:EntIndex()
+            if not bestLeader or (isHuman and not bestIsHuman) or (isHuman == bestIsHuman and idx < bestIdx) then
+                bestLeader = ply
+                bestIsHuman = isHuman
+                bestIdx = idx
+            end
         end
     end
 
-    local count = #potentialLeaders
-    if count == 0 then return nil end
-    if count == 1 then return potentialLeaders[1] end
-
-    table.sort(potentialLeaders, function(a, b)
-        if a:IsBot() ~= b:IsBot() then
-            return not a:IsBot()
-        end
-        return a:EntIndex() < b:EntIndex()
-    end)
-
-    return potentialLeaders[1]
+    return bestLeader
 end
 
 function DDBot.GetClosestPlayer(bot, teammate)
@@ -743,14 +758,9 @@ function DDBot.PlayerSpawn(bot)
 
     timer.Simple(0, function()
         if IsValid(bot) then
-            local model = string.lower(player_manager.TranslatePlayerModel(bot.ChosenPM))
-            if table.HasValue(GAMEMODE.ModelBlacklist, model) then
-                model = "models/player/kleiner.mdl"
-            end
-
-            bot:SetModel(model)
-            bot:SetDTString(0, model)
-            bot:SetVoiceSet(VoiceSetTranslate[model] or "male")
+            bot:SetModel(bot.ChosenPM)
+            bot:SetDTString(0, bot.ChosenPM)
+            bot:SetVoiceSet(VoiceSetTranslate[bot.ChosenPM] or "male")
 
             build.OnSet(bot)
         end
@@ -1552,6 +1562,8 @@ function DDBot.UpdateTargets()
             local botTeam = bot:Team()
 
             pooledTargetCount = 0
+            pooledTargets = {}
+            pooledTargetDistances = {}
 
             -- Check for targets
             for _, ply in player.Iterator() do
@@ -1567,7 +1579,6 @@ function DDBot.UpdateTargets()
                         end
                     end
                 end
-                shouldYield()
             end
 
             if pooledTargetCount > 1 then
@@ -1583,11 +1594,6 @@ function DDBot.UpdateTargets()
                     break
                 end
                 shouldYield()
-            end
-
-            for i = 1, pooledTargetCount do
-                pooledTargetDistances[pooledTargets[i]] = nil
-                pooledTargets[i] = nil
             end
 
             shouldYield()
@@ -1662,11 +1668,13 @@ function DDBot.ProcessSupportQueue()
     while true do
         local curTime = CurTime()
         local canSetPos = gameType ~= "koth" and gameType ~= "htf"
-        local queueCount = #supportQueue
         
+        local processingQueue = supportQueue
+        local queueCount = #processingQueue
+        supportQueue = {}
+
         for i = 1, queueCount do
-            local request = table.remove(supportQueue, 1)
-            if not request then break end
+            local request = processingQueue[i]
 
             local ply = request.ply
             local target = request.target
@@ -1681,8 +1689,8 @@ function DDBot.ProcessSupportQueue()
             local bots = player.GetBots()
             local numBots = #bots
 
-            for i = 1, numBots do
-                local bot = bots[i]
+            for j = 1, numBots do
+                local bot = bots[j]
                 if bot == ply or not IsValid(bot) then continue end
 
                 local controller = bot.ControllerBot
@@ -1800,42 +1808,47 @@ hook.Add("Think", "DDBot_Think", function()
     if ENDROUND then return end
 
     -- General Coroutine
-    if not generalCoroutine or coroutine.status(generalCoroutine) == "dead" then
+    local status = generalCoroutine and coroutine.status(generalCoroutine)
+    if not status or status == "dead" then
         generalCoroutine = coroutine.create(DDBot.UpdateGeneral)
-    end
-    if coroutine.status(generalCoroutine) == "suspended" then
+        status = "suspended"
+    elseif status == "suspended" then
         coroutine.resume(generalCoroutine)
     end
 
     -- Targets Coroutine
-    if not targetsCoroutine or coroutine.status(targetsCoroutine) == "dead" then
+    status = targetsCoroutine and coroutine.status(targetsCoroutine)
+    if not status or status == "dead" then
         targetsCoroutine = coroutine.create(DDBot.UpdateTargets)
-    end
-    if coroutine.status(targetsCoroutine) == "suspended" then
+        status = "suspended"
+    elseif status == "suspended" then
         coroutine.resume(targetsCoroutine)
     end
 
     -- Props Coroutine
-    if not propsCoroutine or coroutine.status(propsCoroutine) == "dead" then
+    status = propsCoroutine and coroutine.status(propsCoroutine)
+    if not status or status == "dead" then
         propsCoroutine = coroutine.create(DDBot.UpdateProps)
-    end
-    if coroutine.status(propsCoroutine) == "suspended" then
+        status = "suspended"
+    elseif status == "suspended" then
         coroutine.resume(propsCoroutine)
     end
 
     -- Queue Coroutine
-    if not queueCoroutine or coroutine.status(queueCoroutine) == "dead" then
+    status = queueCoroutine and coroutine.status(queueCoroutine)
+    if not status or status == "dead" then
         queueCoroutine = coroutine.create(DDBot.ProcessSupportQueue)
-    end
-    if coroutine.status(queueCoroutine) == "suspended" then
+        status = "suspended"
+    elseif status == "suspended" then
         coroutine.resume(queueCoroutine)
     end
 
     -- Quota Coroutine
-    if not quotaCoroutine or coroutine.status(quotaCoroutine) == "dead" then
+    status = quotaCoroutine and coroutine.status(quotaCoroutine)
+    if not status or status == "dead" then
         quotaCoroutine = coroutine.create(DDBot.UpdateQuota)
-    end
-    if coroutine.status(quotaCoroutine) == "suspended" then
+        status = "suspended"
+    elseif status == "suspended" then
         coroutine.resume(quotaCoroutine)
     end
 end)
