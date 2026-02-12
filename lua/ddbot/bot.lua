@@ -695,7 +695,7 @@ function DDBot.PlayerSpawn(bot)
         cachedBuilds = table.GetKeys(Builds)
     end
     
-    local loadoutType = 4 --math.random(1, 4)
+    local loadoutType = math.random(1, 4)
     local spell1 = cachedSpells[math.random(#cachedSpells)]
     local spell2 = cachedSpells[math.random(#cachedSpells)]
     if #cachedSpells > 1 then
@@ -930,6 +930,9 @@ function DDBot.StartCommand(bot, cmd)
 
         if isTargetValid then
             local targetCenter = target:WorldSpaceCenter()
+            local targetWep = target:GetActiveWeapon()
+            local targetMelee = IsValid(targetWep) and targetWep.Base == "dd_meleebase"
+
             if ((isUsingMinigun or DDBot.IsPosWithinFOV(bot, targetCenter)) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and (isUsingMinigun or isTargetVisible)) or isCurrentlyCharging then
                 if isThug and controller.ChargeAttackTime < curTime and controller.ChargeAttackDelay < curTime then
                     if DDBot.RamCheck(bot:WorldSpaceCenter(), targetCenter) then
@@ -945,7 +948,7 @@ function DDBot.StartCommand(bot, cmd)
                 local inMeleeRange = not melee or wantsToCharge or targetDist < 10000
                 if inMeleeRange then
                     local attackButton = IN_ATTACK
-                    if melee and not zombies then
+                    if melee and not zombies and targetMelee then
                         if controller.MeleeStateTimer < curTime and controller.MeleeBlockingCD < curTime and math.random(3) == 1 then
                             controller.MeleeBlocking = true
                             controller.MeleeStateTimer = curTime + math.Rand(1, 2)
@@ -973,7 +976,7 @@ function DDBot.StartCommand(bot, cmd)
                         buttons = buttons + attack2
                         isAlreadyCasting = true
                         controller.MeleeBlocking = false
-                    elseif targetDist < 250000 then
+                    elseif targetDist < 250000 and not targetMelee and not (botWeaponValid and botWeapon:GetClass() == "dd_fists") then
                         buttons = buttons + IN_RELOAD
                         controller.MeleeBlocking = true
                         controller.MeleeStateTimer = curTime + 0.1
