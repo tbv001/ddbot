@@ -308,15 +308,9 @@ function DDBot.AddBot(customName)
 
     if not cachedModels then
         cachedModels = {}
-        local blacklistSet = {}
-        if GAMEMODE.ModelBlacklist then
-            for i = 1, #GAMEMODE.ModelBlacklist do
-                blacklistSet[GAMEMODE.ModelBlacklist[i]] = true
-            end
-        end
         for _, model in pairs(player_manager.AllValidModels()) do
             local modelPath = string.lower(player_manager.TranslatePlayerModel(model))
-            if not blacklistSet[modelPath] then
+            if not table.HasValue(GAMEMODE.ModelBlacklist, modelPath) then
                 cachedModels[#cachedModels + 1] = model
             end
         end
