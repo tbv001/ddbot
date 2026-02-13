@@ -373,7 +373,7 @@ function DDBot.AddBotOverride(bot)
     bot.NextSpawnTime = CurTime() + math.random(2, 6)
 end
 
-function DDBot.IsPosWithinFOV(bot, pos)
+function DDBot.IsPosWithinFOV(bot, pos, customFov)
     if not IsValid(bot) then return false end
 
     local bPos = bot:GetPos()
@@ -390,7 +390,7 @@ function DDBot.IsPosWithinFOV(bot, pos)
     local aimVec = bot:GetAimVector()
     -- local dot = aimVec.x * diffX + aimVec.y * diffY + aimVec.z * diffZ
     local dot = aimVec:Dot(tempVector)
-    local cosVal = cv_FOVVal
+    local cosVal = customFov or cv_FOVVal
 
     return dot >= 0 and dot * dot >= cosVal * cosVal * distSqr
 end
@@ -948,7 +948,7 @@ function DDBot.StartCommand(bot, cmd)
             end
         end
 
-        if controller.MeleeStateTimer < curTime and controller.MeleeBlocking then
+        if (controller.MeleeBlockTimer < curTime and controller.MeleeBlocking) or not melee then
             controller.MeleeBlocking = false
         end
 
@@ -972,11 +972,11 @@ function DDBot.StartCommand(bot, cmd)
                 local inMeleeRange = not melee or wantsToCharge or targetDist < 10000
                 if inMeleeRange then
                     local attackButton = IN_ATTACK
-                    if melee and not zombies and targetMelee and not wantsToCharge then
-                        if controller.MeleeStateTimer < curTime and controller.MeleeBlockingCD < curTime and math.random(3) == 1 then
+                    if melee and targetMelee and not wantsToCharge then
+                        if controller.MeleeBlockTimer < curTime and controller.MeleeBlockingCD < curTime and math.random(3) == 1 then
                             controller.MeleeBlocking = true
-                            controller.MeleeStateTimer = curTime + math.Rand(1, 2)
-                            controller.MeleeBlockingCD = controller.MeleeStateTimer + math.Rand(1, 2)
+                            controller.MeleeBlockTimer = curTime + math.Rand(1, 2)
+                            controller.MeleeBlockingCD = controller.MeleeBlockTimer + math.Rand(1, 2)
                         end
 
                         if controller.MeleeBlocking then
@@ -985,7 +985,8 @@ function DDBot.StartCommand(bot, cmd)
                         end
                     else
                         controller.MeleeBlocking = false
-                        controller.MeleeStateTimer = 0
+                        controller.MeleeBlockTimer = 0
+                        controller.MeleeBlockingCD = 0
                     end
 
                     buttons = buttons + (wantsToCharge and 0 or attackButton) + attack2
@@ -1000,10 +1001,16 @@ function DDBot.StartCommand(bot, cmd)
                         buttons = buttons + attack2
                         isAlreadyCasting = true
                         controller.MeleeBlocking = false
-                    elseif targetDist < 250000 and not targetMelee and not (botWeaponValid and botWeapon:GetClass() == "dd_fists") then
-                        buttons = buttons + IN_RELOAD
-                        controller.MeleeBlocking = true
-                        controller.MeleeStateTimer = curTime + 0.1
+                    elseif targetDist < 250000 and not targetMelee and not (botWeaponValid and botWeapon:GetClass() == "dd_fists") and DDBot.IsPosWithinFOV(target, botPos, 0.64) then
+                        if controller.MeleeBlockTimer < curTime and controller.MeleeBlockingCD < curTime then
+                            controller.MeleeBlocking = true
+                            controller.MeleeBlockTimer = curTime + math.Rand(3, 4)
+                            controller.MeleeBlockingCD = controller.MeleeBlockTimer + math.Rand(2, 3)
+                        end
+
+                        if controller.MeleeBlocking then
+                            buttons = buttons + IN_RELOAD
+                        end
                     end
                 end
 
@@ -1021,6 +1028,9 @@ function DDBot.StartCommand(bot, cmd)
             end
         else
             controller.ShootReactionTime = curTime + math.Rand(0.25, 0.5)
+            controller.MeleeBlocking = false
+            controller.MeleeBlockTimer = 0
+            controller.MeleeBlockingCD = 0
         end
 
         if wantsToCharge and isChargingCheck and not isCurrentlyCharging then
@@ -1279,7 +1289,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             local leftIsClear = leftClearDist >= 100
 
             -- Back up if the target is really close
-            local backupDist = not zombies and not melee and 40000 or melee and 2500 or 160000
+            local backupDist = not zombies and not melee and 40000 or melee and 3600 or 160000
 
             if distance <= backupDist then
                 if not backIsClear then
