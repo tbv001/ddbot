@@ -50,6 +50,8 @@ local cv_CombatMovementEnabled = true
 local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
 local cv_AimPredictionEnabled = true
+local cv_MeleeBlockingEnabled = true
+local cv_ThugChargeEnabled = true
 local cv_AimSpreadMultVal = 1
 local cv_ProcessingLimitVal = 100
 local cv_LoadoutTypeVal = 0
@@ -83,6 +85,8 @@ local cv_CanUseGrenades = CreateConVar("dd_bot_use_grenades", "1", {FCVAR_ARCHIV
 local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use spells")
 local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bot quota")
 local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
+local cv_MeleeBlocking = CreateConVar("dd_bot_melee_blocking", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can melee block")
+local cv_ThugCharge = CreateConVar("dd_bot_thug_charge", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can charge as thugs")
 local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
 local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
 local cv_ProcessingLimit = CreateConVar("dd_bot_processing_limit", "100", {FCVAR_ARCHIVE}, "Sets the bot processing limit per tick")
@@ -235,6 +239,14 @@ cvars.AddChangeCallback("dd_bot_loadout_type", function(convar_name, value_old, 
     cv_LoadoutTypeVal = tonumber(value_new)
 end)
 
+cvars.AddChangeCallback("dd_bot_melee_blocking", function(convar_name, value_old, value_new)
+    cv_MeleeBlockingEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_thug_charge", function(convar_name, value_old, value_new)
+    cv_ThugChargeEnabled = tobool(value_new)
+end)
+
 
 --[[----------------------------
     Functions
@@ -256,6 +268,8 @@ function DDBot.Init()
     cv_FOVVal = math.cos(math.rad(cv_FOV:GetInt() * 0.5))
     cv_ProcessingLimitVal = cv_ProcessingLimit:GetInt()
     cv_LoadoutTypeVal = cv_LoadoutType:GetInt()
+    cv_MeleeBlockingEnabled = cv_MeleeBlocking:GetBool()
+    cv_ThugChargeEnabled = cv_ThugCharge:GetBool()
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -857,7 +871,7 @@ function DDBot.StartCommand(bot, cmd)
     local isTargetValid = IsValid(target)
     local isTargetVisible = isTargetValid and DDBot.IsTargetVisible(bot, target, controller.TraceFilter)
     local isThug = bot:IsThug()
-    local wantsToCharge = isThug and controller.ChargeAttackTime > curTime
+    local wantsToCharge = cv_ThugChargeEnabled and isThug and controller.ChargeAttackTime > curTime
     local isCurrentlyCharging = isThug and botWeaponValid and ((botWeapon.IsCharging and botWeapon:IsCharging()) or (botWeapon.IsChargeAttacking and botWeapon:IsChargeAttacking()))
     local isChargingCheck = isThug and controller.ChargeAttackTime < curTime + 4
     local aboutToThrowNade = cv_CanUseGrenadesEnabled and bot.Skills.agility == 15 and isTargetVisible and controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
@@ -948,7 +962,7 @@ function DDBot.StartCommand(bot, cmd)
             end
         end
 
-        if (controller.MeleeBlockTimer < curTime and controller.MeleeBlocking) or not melee then
+        if (controller.MeleeBlockTimer < curTime and controller.MeleeBlocking) or not melee or not cv_MeleeBlockingEnabled then
             controller.MeleeBlocking = false
         end
 
@@ -958,7 +972,7 @@ function DDBot.StartCommand(bot, cmd)
             local targetMelee = IsValid(targetWep) and targetWep.Base == "dd_meleebase"
 
             if ((isUsingMinigun or DDBot.IsPosWithinFOV(bot, targetCenter)) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and (isUsingMinigun or isTargetVisible)) or isCurrentlyCharging then
-                if isThug and controller.ChargeAttackTime < curTime and controller.ChargeAttackDelay < curTime then
+                if cv_ThugChargeEnabled and isThug and controller.ChargeAttackTime < curTime and controller.ChargeAttackDelay < curTime then
                     if DDBot.RamCheck(bot:WorldSpaceCenter(), targetCenter) then
                         controller.ChargeAttackTime = curTime + 5
                         controller.ChargeAttackDelay = curTime + math.random(10, 20)
@@ -973,7 +987,7 @@ function DDBot.StartCommand(bot, cmd)
                 if inMeleeRange then
                     local attackButton = IN_ATTACK
                     if melee and targetMelee and not wantsToCharge then
-                        if controller.MeleeBlockTimer < curTime and controller.MeleeBlockingCD < curTime and math.random(3) == 1 then
+                        if cv_MeleeBlockingEnabled and controller.MeleeBlockTimer < curTime and controller.MeleeBlockingCD < curTime and math.random(3) == 1 then
                             controller.MeleeBlocking = true
                             controller.MeleeBlockTimer = curTime + math.Rand(1, 2)
                             controller.MeleeBlockingCD = controller.MeleeBlockTimer + math.Rand(1, 2)
@@ -1002,7 +1016,7 @@ function DDBot.StartCommand(bot, cmd)
                         isAlreadyCasting = true
                         controller.MeleeBlocking = false
                     elseif targetDist < 250000 and not targetMelee and not (botWeaponValid and botWeapon:GetClass() == "dd_fists") and DDBot.IsPosWithinFOV(target, botPos, 0.64) then
-                        if controller.MeleeBlockTimer < curTime and controller.MeleeBlockingCD < curTime then
+                        if cv_MeleeBlockingEnabled and controller.MeleeBlockTimer < curTime and controller.MeleeBlockingCD < curTime then
                             controller.MeleeBlocking = true
                             controller.MeleeBlockTimer = curTime + math.Rand(3, 4)
                             controller.MeleeBlockingCD = controller.MeleeBlockTimer + math.Rand(2, 3)

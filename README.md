@@ -25,6 +25,8 @@ git clone https://github.com/tbv001/ddbot.git
 - dd_bot_use_grenades [0/1] - Enables or disables grenade usage for bots.
 - dd_bot_use_spells [0/1] - Enables or disables spell usage for bots.
 - dd_bot_aim_prediction [0/1] - Enables or disables aim prediction for bots.
+- dd_bot_melee_blocking [0/1] - Enables or disables melee blocking for bots.
+- dd_bot_thug_charge [0/1] - Enables or disables charging as thugs for bots.
 - dd_bot_quota [0-128] - Sets the bot quota.
 - dd_bot_processing_limit [number] - Sets the bot processing limit per tick.
 - dd_bot_loadout_type [0/1/2/3] - Sets the bot loadout type (0: random, 1: gun, 2: magic, 3: melee).
