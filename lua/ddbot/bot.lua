@@ -919,7 +919,7 @@ function DDBot.StartCommand(bot, cmd)
         end
 
         if cv_CanUseSpellsEnabled and controller.NextAttack2Delay < curTime and (curSpell and bot.CanCast and bot:CanCast(curSpell)) and (bot.IsMagicLoadout or math.random(3) == 1) and not isUsingMinigun and not isThug and not isOnLadder then
-            local nextAttack2Delay = bot.IsMagicLoadout and math.random(1, 3) or math.random(5, 10)
+            local nextAttack2Delay = bot.IsMagicLoadout and math.random(3, 5) or math.random(5, 10)
             local spellClass = curSpell:GetClass()
             
             if isTargetValid then
