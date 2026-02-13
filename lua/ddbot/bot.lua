@@ -1282,7 +1282,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             controller.LastSeenTarget = curTime + 1
             controller.IsLastKnownTargetPosValid = true
         elseif controller.LastSeenTarget > curTime then
-            controller.LastKnownTargetPos:Set(targetPos)
+            controller.LastKnownTargetPos:Set(controller.Target:GetPos())
         end
 
         if not visibleTargetPos and controller.IsLastKnownTargetPosValid and controller.LastSeenTarget < curTime and botPos:DistToSqr(controller.LastKnownTargetPos) < 900 then
