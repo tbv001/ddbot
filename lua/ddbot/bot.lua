@@ -1,4 +1,5 @@
 include("ddbot/shared.lua")
+include("ddbot/grid.lua")
 
 local isTeamPlay = false
 local entityLoaded = false
@@ -1605,8 +1606,16 @@ function DDBot.UpdateGeneral()
 end
 
 function DDBot.UpdateTargets()
+    local targetsGrid = DDBot.SpatialGrid.Create(1500)
+
     while true do
-        local curTime = CurTime()
+        targetsGrid:Clear()
+        for _, ply in player.Iterator() do
+            if ply:Alive() then
+                targetsGrid:Insert(ply, ply:GetPos())
+            end
+            shouldYield()
+        end
 
         for _, bot in player.Iterator() do
             if not bot:IsBot() or not bot:Alive() then continue end
@@ -1621,20 +1630,16 @@ function DDBot.UpdateTargets()
             pooledTargets = {}
             pooledTargetDistances = {}
 
-            -- Check for targets
-            for _, ply in player.Iterator() do
-                if ply ~= bot and ply:Alive() then
-                    local isEnemy = not isTeamPlay or ply:Team() ~= botTeam
+            local candidates, candidateCount = targetsGrid:GetInRadius(botPos, 1500, function(ply)
+                if ply == bot or not ply:Alive() then return false end
+                return not isTeamPlay or ply:Team() ~= botTeam
+            end)
 
-                    if isEnemy then
-                        local distSqr = ply:GetPos():DistToSqr(botPos)
-                        if distSqr < 2250000 then
-                            pooledTargets[pooledTargetCount + 1] = ply
-                            pooledTargetDistances[ply] = distSqr
-                            pooledTargetCount = pooledTargetCount + 1
-                        end
-                    end
-                end
+            pooledTargetCount = candidateCount
+            pooledTargets = candidates
+            for i = 1, candidateCount do
+                local ply = candidates[i]
+                pooledTargetDistances[ply] = ply:GetPos():DistToSqr(botPos)
                 shouldYield()
             end
 
@@ -1661,8 +1666,23 @@ function DDBot.UpdateTargets()
 end
 
 function DDBot.UpdateProps()
+    local propsGrid = DDBot.SpatialGrid.Create(500)
+
     while true do
         local curTime = CurTime()
+
+        propsGrid:Clear()
+        local allEnts = ents.GetAll()
+        for i = 1, #allEnts do
+            local prop = allEnts[i]
+            if IsValid(prop) then
+                local propClass = prop:GetClass()
+                if (propClass:sub(1, 5) == "prop_" or propClass == "func_breakable") and prop:Health() > 0 then
+                    propsGrid:Insert(prop, prop:GetPos())
+                end
+            end
+            shouldYield()
+        end
 
         for _, bot in player.Iterator() do
             if not bot:IsBot() or not bot:Alive() then continue end
@@ -1678,30 +1698,29 @@ function DDBot.UpdateProps()
                 local wep = bot:GetActiveWeapon()
                 local melee = IsValid(wep) and wep.Base == "dd_meleebase"
                 local radiusCheck = melee and 50 or 100
-                local propsInRadius = ents.FindInSphere(botPos, radiusCheck)
                 local closestDist = math.huge
                 local closestProp
 
-                for i = 1, #propsInRadius do
-                    local prop = propsInRadius[i]
-                    if not IsValid(prop) then continue end
+                local candidates, candidateCount = propsGrid:GetInRadius(botPos, radiusCheck, function(prop)
+                    if not IsValid(prop) or prop:Health() <= 0 then return false end
+                    return true
+                end)
 
-                    local propClass = prop:GetClass()
-                    if (propClass:sub(1, 5) == "prop_" or propClass == "func_breakable") and prop:Health() > 0 then
-                        local dist = botPos:DistToSqr(prop:GetPos())
-                        if dist < closestDist then
-                            local entID = prop:EntIndex()
-                            local explodeDamage = explosiveCache[entID]
-                            if explodeDamage == nil then
-                                local kvs = prop:GetKeyValues()
-                                explodeDamage = tonumber(kvs and kvs["ExplodeDamage"] or 0)
-                                explosiveCache[entID] = explodeDamage
-                            end
+                for i = 1, candidateCount do
+                    local prop = candidates[i]
+                    local dist = botPos:DistToSqr(prop:GetPos())
+                    if dist < closestDist then
+                        local entID = prop:EntIndex()
+                        local explodeDamage = explosiveCache[entID]
+                        if explodeDamage == nil then
+                            local kvs = prop:GetKeyValues()
+                            explodeDamage = tonumber(kvs and kvs["ExplodeDamage"] or 0)
+                            explosiveCache[entID] = explodeDamage
+                        end
 
-                            if explodeDamage <= 0 then
-                                closestDist = dist
-                                closestProp = prop
-                            end
+                        if explodeDamage <= 0 then
+                            closestDist = dist
+                            closestProp = prop
                         end
                     end
                     shouldYield()
