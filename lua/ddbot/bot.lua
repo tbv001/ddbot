@@ -1,36 +1,3 @@
-local include = include
-local math = math
-local Vector = Vector
-local Angle = Angle
-local CreateConVar = CreateConVar
-local concommand = concommand
-local IsValid = IsValid
-local table = table
-local player = player
-local pairs = pairs
-local string = string
-local GetConVar = GetConVar
-local MsgN = MsgN
-local navmesh = navmesh
-local cvars = cvars
-local tonumber = tonumber
-local tobool = tobool
-local ents = ents
-local file = file
-local game = game
-local player_manager = player_manager
-local tostring = tostring
-local CurTime = CurTime
-local util = util
-local team = team
-local Color = Color
-local timer = timer
-local VectorRand = VectorRand
-local FrameTime = FrameTime
-local LerpAngle = LerpAngle
-local coroutine = coroutine
-local hook = hook
-
 include("ddbot/shared.lua")
 
 local isTeamPlay = false
@@ -64,38 +31,46 @@ local pooledTargetCount = 0
 local tempVector = Vector(0, 0, 0)
 local tempVector1 = Vector(0, 0, 0)
 local tempAngle = Angle(0, 0, 0)
-local targetVisTrace = {mask = MASK_VISIBLE}
-local propTrace = {mask = MASK_SHOT}
-local dirTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13)}
-local ramTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13)}
-local doorTrace = {}
+local targetVisTrace = { mask = MASK_VISIBLE }
+local propTrace = { mask = MASK_SHOT }
+local dirTrace = { mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13) }
+local ramTrace = { mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13) }
 local cachedBotNames
 local explosiveCache = {}
 
 
 --[[----------------------------
     ConVars
-----------------------------]]--
+----------------------------]] --
 
-local cv_AimSpeedMult = CreateConVar("dd_bot_aim_speed_mult", "1", {FCVAR_ARCHIVE}, "Sets the bot aim speed multiplier")
-local cv_Slide = CreateConVar("dd_bot_slide", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can slide")
-local cv_Dive = CreateConVar("dd_bot_dive", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can dive")
-local cv_CombatMovement = CreateConVar("dd_bot_combat_movement", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use combat movement")
-local cv_CanUseGrenades = CreateConVar("dd_bot_use_grenades", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use grenades")
-local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use spells")
-local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bot quota")
-local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
-local cv_MeleeBlocking = CreateConVar("dd_bot_melee_blocking", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can melee block")
-local cv_ThugCharge = CreateConVar("dd_bot_thug_charge", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can charge as thugs")
-local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
-local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
-local cv_ProcessingLimit = CreateConVar("dd_bot_processing_limit", "100", {FCVAR_ARCHIVE}, "Sets the bot processing limit per tick")
-local cv_LoadoutType = CreateConVar("dd_bot_loadout_type", "0", {FCVAR_ARCHIVE}, "Sets the bot loadout type (0: random, 1: gun, 2: magic, 3: melee)")
+local cv_AimSpeedMult = CreateConVar("dd_bot_aim_speed_mult", "1", { FCVAR_ARCHIVE }, "Sets the bot aim speed multiplier")
+local cv_Slide = CreateConVar("dd_bot_slide", "1", { FCVAR_ARCHIVE }, "Sets whether or not bots can slide")
+local cv_Dive = CreateConVar("dd_bot_dive", "1", { FCVAR_ARCHIVE }, "Sets whether or not bots can dive")
+local cv_CombatMovement = CreateConVar("dd_bot_combat_movement", "1", { FCVAR_ARCHIVE },
+    "Sets whether or not bots can use combat movement")
+local cv_CanUseGrenades = CreateConVar("dd_bot_use_grenades", "1", { FCVAR_ARCHIVE },
+    "Sets whether or not bots can use grenades")
+local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", { FCVAR_ARCHIVE },
+    "Sets whether or not bots can use spells")
+local cv_Quota = CreateConVar("dd_bot_quota", "0", { FCVAR_ARCHIVE }, "Sets the bot quota")
+local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", { FCVAR_ARCHIVE },
+    "Sets whether or not bots can use aim prediction")
+local cv_MeleeBlocking = CreateConVar("dd_bot_melee_blocking", "1", { FCVAR_ARCHIVE },
+    "Sets whether or not bots can melee block")
+local cv_ThugCharge = CreateConVar("dd_bot_thug_charge", "1", { FCVAR_ARCHIVE },
+    "Sets whether or not bots can charge as thugs")
+local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", { FCVAR_ARCHIVE },
+    "Sets the bot aim spread multiplier")
+local cv_FOV = CreateConVar("dd_bot_fov", "100", { FCVAR_ARCHIVE }, "Sets the bot field of view")
+local cv_ProcessingLimit = CreateConVar("dd_bot_processing_limit", "100", { FCVAR_ARCHIVE },
+    "Sets the bot processing limit per tick")
+local cv_LoadoutType = CreateConVar("dd_bot_loadout_type", "0", { FCVAR_ARCHIVE },
+    "Sets the bot loadout type (0: random, 1: gun, 2: magic, 3: melee)")
 
 
 --[[----------------------------
     Commands
-----------------------------]]--
+----------------------------]] --
 
 concommand.Add("dd_bot_add", function(ply, _, args)
     if not IsValid(ply) then
@@ -126,7 +101,7 @@ concommand.Add("dd_bot_kick", function(ply, _, args)
     if name then
         local bots = player.GetBots()
         for i = 1, #bots do
-            if string.find(bots[i]:GetName(), name, 1, true) then
+            if string.find(bots[i]:Nick(), name, 1, true) then
                 bots[i]:Kick()
                 cv_Quota:SetInt(math.max(0, #player.GetBots() + #player.GetHumans() - 1))
                 return
@@ -166,7 +141,7 @@ concommand.Add("dd_bot_generatenavmesh", function(ply, _, args)
 
     local spawnEnts = ents.FindByClass("info_player_*")
     local numSpawnEnts = #spawnEnts
-    local trData = {mask = MASK_PLAYERSOLID_BRUSHONLY}
+    local trData = { mask = MASK_PLAYERSOLID_BRUSHONLY }
 
     for i = 1, numSpawnEnts do
         local ent = spawnEnts[i]
@@ -189,7 +164,7 @@ end, nil, "Generates a cheap navmesh, requires sv_cheats 1")
 
 --[[----------------------------
     ConVar Change Callbacks
-----------------------------]]--
+----------------------------]] --
 
 cvars.AddChangeCallback("dd_bot_quota", function(convar_name, value_old, value_new)
     cv_QuotaVal = tonumber(value_new)
@@ -250,12 +225,12 @@ end)
 
 --[[----------------------------
     Functions
-----------------------------]]--
+----------------------------]] --
 
 function DDBot.Init()
     isTeamPlay = GAMEMODE:GetGametype() ~= "ffa"
     gameType = GAMEMODE:GetGametype()
-    
+
     cv_QuotaVal = cv_Quota:GetInt()
     cv_AimSpeedMultVal = cv_AimSpeedMult:GetFloat()
     cv_SlideEnabled = cv_Slide:GetBool()
@@ -398,7 +373,7 @@ function DDBot.IsPosWithinFOV(bot, pos, customFov)
     tempVector:Set(pos)
     tempVector:Sub(bPos)
     local distSqr = tempVector:LengthSqr()
-    
+
     if distSqr == 0 then return true end
 
     local aimVec = bot:GetAimVector()
@@ -419,7 +394,7 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         return nil
     end
 
-    if botEyePos:DistToSqr(targetCenter) > 10000 then 
+    if botEyePos:DistToSqr(targetCenter) > 10000 then
         -- Field of view check
         if not DDBot.IsPosWithinFOV(bot, targetCenter) then
             return nil
@@ -472,57 +447,57 @@ function DDBot.ThrowNade(bot)
 
     local curTime = CurTime()
     local wep = bot:GetActiveWeapon()
-	
-	if bot.IsCrow and bot:IsCrow() then return end
-	
-	if IsValid(wep) then
-		if bot:IsSprinting() then return end
-		if wep.IsCasting and wep:IsCasting() then return end
-		if wep.IsReloading and wep:IsReloading() then return end
-		if wep.GetNextReload and wep:GetNextReload() > curTime then return end
-		if wep.IsAttacking and wep:IsAttacking() then return end
-		if wep.IsBlocking and wep:IsBlocking() then return end
-		
-		if wep.SetSpellEnd then
-			wep:SetSpellEnd(curTime + 0.65)
-		end
-	end
 
-	local ent = ents.Create("npc_grenade_frag")
-	if IsValid(ent) then
-		local v = bot:GetShootPos()
-		v = v + bot:GetForward() * 5
-		v = v + bot:GetRight() * -8
-		v = v + bot:GetUp() * -4
-		ent:SetPos(v)
-		local ang = bot:GetAngles()
-		ent:SetAngles(ang)
-		ent:SetOwner(bot)
-		ent:Activate()
-		ent:Spawn()
-		ent:SetSaveValue("m_hThrower", bot )
-		local col = team.GetColor(bot:Team()) or Color(255, 255, 255)
-		col.a = 255
-		
-		ent:SetMaterial("models/shiny")
-		ent:SetColor(col)
-		
-		ent:SetSaveValue("m_flDamage", 115 )
-		ent:SetSaveValue("m_DmgRadius", 280 )
+    if bot.IsCrow and bot:IsCrow() then return end
 
-		ent:Fire("SetTimer",1.8,0)
-		ent:SetModelScale( 1.5, 0 )
+    if IsValid(wep) then
+        if bot:IsSprinting() then return end
+        if wep.IsCasting and wep:IsCasting() then return end
+        if wep.IsReloading and wep:IsReloading() then return end
+        if wep.GetNextReload and wep:GetNextReload() > curTime then return end
+        if wep.IsAttacking and wep:IsAttacking() then return end
+        if wep.IsBlocking and wep:IsBlocking() then return end
 
-		local phys = ent:GetPhysicsObject()
-		if IsValid(phys) then
-			phys:Wake()
-			phys:SetVelocity(bot:GetVelocity()+bot:GetAimVector() * 900)
-			phys:AddAngleVelocity(Vector(600,math.random(-1200,1200),0))
-		end
+        if wep.SetSpellEnd then
+            wep:SetSpellEnd(curTime + 0.65)
+        end
+    end
 
-		bot:PlayGesture(ACT_GMOD_GESTURE_ITEM_DROP)
-		ent:EmitSound( "weapons/slam/throw.wav" )
-	end
+    local ent = ents.Create("npc_grenade_frag")
+    if IsValid(ent) then
+        local v = bot:GetShootPos()
+        v = v + bot:GetForward() * 5
+        v = v + bot:GetRight() * -8
+        v = v + bot:GetUp() * -4
+        ent:SetPos(v)
+        local ang = bot:GetAngles()
+        ent:SetAngles(ang)
+        ent:SetOwner(bot)
+        ent:Activate()
+        ent:Spawn()
+        ent:SetSaveValue("m_hThrower", bot)
+        local col = team.GetColor(bot:Team()) or Color(255, 255, 255)
+        col.a = 255
+
+        ent:SetMaterial("models/shiny")
+        ent:SetColor(col)
+
+        ent:SetSaveValue("m_flDamage", 115)
+        ent:SetSaveValue("m_DmgRadius", 280)
+
+        ent:Fire("SetTimer", 1.8, 0)
+        ent:SetModelScale(1.5, 0)
+
+        local phys = ent:GetPhysicsObject()
+        if IsValid(phys) then
+            phys:Wake()
+            phys:SetVelocity(bot:GetVelocity() + bot:GetAimVector() * 900)
+            phys:AddAngleVelocity(Vector(600, math.random(-1200, 1200), 0))
+        end
+
+        bot:PlayGesture(ACT_GMOD_GESTURE_ITEM_DROP)
+        ent:EmitSound("weapons/slam/throw.wav")
+    end
 end
 
 function DDBot.GetLeader(bot)
@@ -573,12 +548,12 @@ end
 
 function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetAimPos)
     if not IsValid(target) then return nil end
-    
+
     local targetPos = targetAimPos or target:WorldSpaceCenter()
     -- local targetVel = target:GetVelocity()
     local dist = shootPos:Distance(targetPos)
     local timeToHit = dist / projectileSpeed
-    
+
     -- return targetPos + (targetVel * timeToHit)
     tempVector:Set(target:GetVelocity())
     tempVector:Mul(timeToHit)
@@ -594,7 +569,7 @@ function DDBot.FindRandomSpot(bot)
     if not randomPosList or #randomPosList == 0 then
         return bot:GetPos()
     end
-    
+
     local randomNav = randomPosList[math.random(1, #randomPosList)]
     local pos = randomNav and randomNav:GetRandomPoint()
 
@@ -603,12 +578,12 @@ end
 
 function DDBot.GiveSupport(ply, target)
     if not IsValid(ply) or not IsValid(target) then return end
-    
+
     local plyIdx = ply:EntIndex()
     if supportQueueLookup[plyIdx] then return end
-    
+
     supportQueueLookup[plyIdx] = true
-    supportQueue[#supportQueue + 1] = {ply = ply, target = target}
+    supportQueue[#supportQueue + 1] = { ply = ply, target = target }
 end
 
 function DDBot.IsDirClear(bot, dir)
@@ -623,7 +598,7 @@ function DDBot.IsDirClear(bot, dir)
 
     local dirRange = 75
     local center = bot:WorldSpaceCenter()
-    
+
     -- local endPos = center + dir * dirRange
     tempVector:Set(dir)
     tempVector:Mul(dirRange)
@@ -631,7 +606,7 @@ function DDBot.IsDirClear(bot, dir)
     local endPos = tempVector
 
     local filter = controller.TraceFilter
-    
+
     dirTrace.start = center
     dirTrace.endpos = endPos
     dirTrace.filter = filter
@@ -650,7 +625,7 @@ function DDBot.IsDirClear(bot, dir)
     tempVector:Mul(clearDist)
     tempVector:Add(botPos)
     tempVector1:Set(tempVector)
-    
+
     dirTrace.start = tempVector1
     tempVector:Sub(groundCheckOffset)
     dirTrace.endpos = tempVector
@@ -675,10 +650,9 @@ function DDBot.RamCheck(v1, v2)
     return not tr.Hit
 end
 
-
 --[[----------------------------
     Hook Functions
-----------------------------]]--
+----------------------------]] --
 
 function DDBot.PlayerSpawn(bot)
     if not (Spells and Perks and Builds and Weapons) then return end
@@ -698,7 +672,7 @@ function DDBot.PlayerSpawn(bot)
             end
         end
     end
-    
+
     if not cachedSpells then
         local tempSpells = table.GetKeys(Spells)
         local numTempSpells = #tempSpells
@@ -722,7 +696,7 @@ function DDBot.PlayerSpawn(bot)
 
         cachedBuilds = table.GetKeys(Builds)
     end
-    
+
     local loadoutType
     if cv_LoadoutTypeVal == 1 then
         loadoutType = 1
@@ -767,7 +741,7 @@ function DDBot.PlayerSpawn(bot)
         local thugOrNot = math.random(5) == 1 and "thug" or "adrenaline"
         primary = "none"
 
-        local bList = {"agile", "healthy"}
+        local bList = { "agile", "healthy" }
         build = Builds[bList[math.random(#bList)]]
         perk = thugOrNot
 
@@ -780,12 +754,12 @@ function DDBot.PlayerSpawn(bot)
         bot.Skills["agility"] = 0
     end
 
-    bot.Loadout = {primary, secondary}
-    bot.SpellsToGive = {spell1, spell2}
+    bot.Loadout = { primary, secondary }
+    bot.SpellsToGive = { spell1, spell2 }
     if math.random(5) == 1 and loadoutType ~= 4 then
-        bot.PerksToGive = {"blank"}
+        bot.PerksToGive = { "blank" }
     else
-        bot.PerksToGive = {perk}
+        bot.PerksToGive = { perk }
     end
 
     timer.Simple(0, function()
@@ -824,7 +798,7 @@ function DDBot.PlayerHurt(ply, att, hp, dmg)
         local plyShootPos = ply:GetShootPos()
         local target = controller.Target
         local controllerPos = controller:GetPos()
-        
+
         if not IsValid(target) then
             controller.Target = att
             controller.ForgetTarget = curTime + 2
@@ -872,9 +846,11 @@ function DDBot.StartCommand(bot, cmd)
     local isTargetVisible = isTargetValid and DDBot.IsTargetVisible(bot, target, controller.TraceFilter)
     local isThug = bot:IsThug()
     local wantsToCharge = cv_ThugChargeEnabled and isThug and controller.ChargeAttackTime > curTime
-    local isCurrentlyCharging = isThug and botWeaponValid and ((botWeapon.IsCharging and botWeapon:IsCharging()) or (botWeapon.IsChargeAttacking and botWeapon:IsChargeAttacking()))
+    local isCurrentlyCharging = isThug and botWeaponValid and
+    ((botWeapon.IsCharging and botWeapon:IsCharging()) or (botWeapon.IsChargeAttacking and botWeapon:IsChargeAttacking()))
     local isChargingCheck = isThug and controller.ChargeAttackTime < curTime + 4
-    local aboutToThrowNade = cv_CanUseGrenadesEnabled and bot.Skills.agility == 15 and isTargetVisible and controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
+    local aboutToThrowNade = cv_CanUseGrenadesEnabled and bot.Skills.agility == 15 and isTargetVisible and
+    controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
     local curSpell = bot.GetCurrentSpell and bot:GetCurrentSpell()
     local isAlreadyAttacking = false
     local isAlreadyCasting = false
@@ -921,7 +897,7 @@ function DDBot.StartCommand(bot, cmd)
         if cv_CanUseSpellsEnabled and controller.NextAttack2Delay < curTime and (curSpell and bot.CanCast and bot:CanCast(curSpell)) and (bot.IsMagicLoadout or math.random(3) == 1) and not isUsingMinigun and not isThug and not isOnLadder then
             local nextAttack2Delay = bot.IsMagicLoadout and math.random(3, 5) or math.random(5, 10)
             local spellClass = curSpell:GetClass()
-            
+
             if isTargetValid then
                 if spellClass ~= "spell_firebolt2" or botPos:DistToSqr(target:GetPos()) <= 48400 then
                     local nextAttack2Time = melee and 1 or bot.IsMagicLoadout and 3 or 2
@@ -933,7 +909,7 @@ function DDBot.StartCommand(bot, cmd)
             if spellClass == "spell_cure" then
                 if isTeamPlay then
                     local closestTeammate = DDBot.GetClosestPlayer(bot, true)
-                    if IsValid(closestTeammate) and bot:VisibleVec(closestTeammate:GetPos()) then
+                    if closestTeammate and IsValid(closestTeammate) and bot:VisibleVec(closestTeammate:GetPos()) then
                         controller.LookAt:Set(closestTeammate:GetPos())
                     else
                         controller.LookAt:Set(botPos)
@@ -984,7 +960,8 @@ function DDBot.StartCommand(bot, cmd)
                 end
 
                 local targetDist = botPos:DistToSqr(target:GetPos())
-                local attack2 = (wantsToCharge or (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime)) and IN_ATTACK2 or 0
+                local attack2 = (wantsToCharge or (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime)) and
+                IN_ATTACK2 or 0
                 local inMeleeRange = not melee or wantsToCharge or targetDist < 10000
                 if inMeleeRange then
                     local attackButton = IN_ATTACK
@@ -1108,7 +1085,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         bot.ControllerBot.TraceFilter[2] = bot.ControllerBot
         controller = bot.ControllerBot
     end
-    
+
     local wep = bot:GetActiveWeapon()
     local botPos = bot:GetPos()
     local curTime = CurTime()
@@ -1172,7 +1149,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local isKothMode = gameType == "koth"
     if isKothMode then
         if objective and IsValid(objective) then
-            objective.radius2d = objective.radius2d or ((objective:GetRadius() - 12) * (objective:GetRadius() - 12) / 1.5)
+            objective.radius2d = objective.radius2d or
+            ((objective:GetRadius() - 12) * (objective:GetRadius() - 12) / 1.5)
             objectivePos = objective:GetPos()
         end
 
@@ -1197,7 +1175,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
                     if not IsValid(flag:GetCarrier()) then
                         rand = 32
                     end
-                    
+
                     -- rand = VectorRand() * rand
                     -- tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
                     -- controller.PosGen = flag:GetPos() + tempVector
@@ -1223,7 +1201,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 if IsValid(controller.Target) then
                     rand = rand * 1.25
                 end
-                
+
                 -- rand = VectorRand() * rand
                 -- tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
                 -- controller.PosGen = point_pos + tempVector
@@ -1254,7 +1232,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
                     tempVector:Set(VectorRand())
                     tempVector:Mul(200)
                     tempVector.z = 0
-                    
+
                     controller.PosGen:Set(leader:GetPos())
                     controller.PosGen:Add(tempVector)
 
@@ -1274,7 +1252,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
             visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, controller.TraceFilter)
         end
 
-        local targetPos = visibleTargetPos and controller.Target:GetPos() or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:GetPos()
+        local targetPos = visibleTargetPos and controller.Target:GetPos() or
+        (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:GetPos()
         local distance = targetPos:DistToSqr(botPos)
 
         if visibleTargetPos then
@@ -1460,12 +1439,13 @@ function DDBot.PlayerMove(bot, cmd, mv)
             resultingForwardSpeed = 0
         end
 
-        local aimAtPos = visibleTargetPos or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:WorldSpaceCenter()
+        local aimAtPos = visibleTargetPos or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or
+        controller.Target:WorldSpaceCenter()
 
         local wepValid = IsValid(wep)
         if wepValid and cv_AimPredictionEnabled then
             local class = wep:GetClass()
-            
+
             if class == "dd_xbow" then
                 local predictedPos = DDBot.CalculateAimPrediction(3000, botShootPos, controller.Target, aimAtPos)
                 if predictedPos then
@@ -1497,13 +1477,13 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         if controller.ForcedLookAt and controller.LookAtTime > curTime then
-             if controller.LookAt ~= tempVector then
+            if controller.LookAt ~= tempVector then
                 tempVector:Set(controller.LookAt)
             end
             tempVector:Sub(botShootPos)
             -- targetAng = (controller.LookAt - botShootPos):Angle()
             targetAng = tempVector:Angle()
-            
+
             lerp = 1
         end
 
@@ -1521,7 +1501,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 tempVector:Mul(100)
                 tempVector.z = 0
                 tempVector:Add(bot:EyePos())
-                
+
                 controller.LookAt:Set(tempVector)
 
                 controller.LookAtTime = curTime + math.Rand(0.9, 1.3)
@@ -1531,7 +1511,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         local lookAtAngle
 
         if controller.LookAtTime > curTime then
-             if controller.LookAt ~= tempVector then
+            if controller.LookAt ~= tempVector then
                 tempVector:Set(controller.LookAt)
             end
             tempVector:Sub(botShootPos)
@@ -1580,10 +1560,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
     mv:SetSideSpeed(resultingSideSpeed)
 end
 
-
 --[[----------------------------
     Coroutines
-----------------------------]]--
+----------------------------]] --
 
 local curProcessing = 0
 local generalCoroutine = nil
@@ -1746,7 +1725,7 @@ function DDBot.ProcessSupportQueue()
     while true do
         local curTime = CurTime()
         local canSetPos = gameType ~= "koth" and gameType ~= "htf"
-        
+
         local processingQueue = supportQueue
         local queueCount = #processingQueue
         supportQueue = {}
@@ -1837,10 +1816,9 @@ function DDBot.UpdateQuota()
     end
 end
 
-
 --[[----------------------------
     Hooks
-----------------------------]]--
+----------------------------]] --
 
 hook.Add("PlayerDisconnected", "DDBot_PlayerDisconnected", function(bot)
     if IsValid(bot.ControllerBot) then

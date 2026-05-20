@@ -1,9 +1,3 @@
-local AddCSLuaFile = AddCSLuaFile
-local Vector = Vector
-local IsValid = IsValid
-local Path = Path
-local coroutine = coroutine
-
 if SERVER then AddCSLuaFile() end
 
 ENT.Base = "base_nextbot"
@@ -103,13 +97,17 @@ function ENT:ChasePos()
 	self.P = Path("Follow")
 	self.P:SetMinLookAheadDistance(300)
 	self.P:SetGoalTolerance(20)
-	self.P:Compute(self, self.PosGen, function(area, fromArea, ladder, elevator, length) return pathGenerator(self, area, fromArea, ladder, elevator, length) end)
+	self.P:Compute(self, self.PosGen,
+		function(area, fromArea, ladder, elevator, length) return pathGenerator(self, area, fromArea, ladder, elevator,
+				length) end)
 
 	if not IsValid(self.P) then return end
 
 	while IsValid(self.P) do
 		if self.PosGen then
-			self.P:Compute(self, self.PosGen, function(area, fromArea, ladder, elevator, length) return pathGenerator(self, area, fromArea, ladder, elevator, length) end)
+			self.P:Compute(self, self.PosGen,
+				function(area, fromArea, ladder, elevator, length) return pathGenerator(self, area, fromArea, ladder,
+						elevator, length) end)
 			self.cur_segment = 2
 		end
 

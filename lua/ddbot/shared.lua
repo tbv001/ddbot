@@ -1,7 +1,3 @@
-local FindMetaTable = FindMetaTable
-local IsValid = IsValid
-local CurTime = CurTime
-
 local M_Player = FindMetaTable("Player")
 local M_Entity = FindMetaTable("Entity")
 local P_AnimRestartGesture = M_Player.AnimRestartGesture
@@ -31,53 +27,52 @@ function DDBot.BotAnimations(pl, velocity)
         onground = E_OnGround(pl)
 
         if P_IsCrow and P_IsCrow(pl) then
-            local iSeq, iIdeal = E_LookupSequence( pl, "Idle01" )
-            local fVelocity = V_LengthSqr( velocity )
-            
+            local iSeq, iIdeal = E_LookupSequence(pl, "Idle01")
+            local fVelocity = V_LengthSqr(velocity)
+
             if onground then
-                if fVelocity > 1 then 
-                    iSeq = E_LookupSequence( pl, "Run" )
+                if fVelocity > 1 then
+                    iSeq = E_LookupSequence(pl, "Run")
                 else
-                    iSeq = E_LookupSequence( pl, "Idle01" )
+                    iSeq = E_LookupSequence(pl, "Idle01")
                 end
             else
                 if fVelocity > 1 then
-                    iSeq = E_LookupSequence( pl, "Fly01" )
+                    iSeq = E_LookupSequence(pl, "Fly01")
                 else
-                    iSeq = E_LookupSequence( pl, "Fly01" )
+                    iSeq = E_LookupSequence(pl, "Fly01")
                 end
             end
-            
+
             return iIdeal, iSeq
-            
         end
-        
+
         if pl._efSlide and IsValid(pl._efSlide) then
             local iIdeal, iSeq = ACT_MP_SWIM, -1
             return iIdeal, iSeq
         end
-        
-        local wep = P_GetActiveWeapon( pl )
+
+        local wep = P_GetActiveWeapon(pl)
         local nosprint = IsValid(wep) and wep.IgnoreSprint
         local sequence = "run_all_charging"
         if wep.RunSequence then
             sequence = wep:RunSequence()
         end
-        
+
         len2d = V_Length2DSqr(velocity)
 
-        
+
         local is_wallrunning = pl._efWallRun and pl._efWallRun.IsActive and pl._efWallRun:IsActive()
-        
-        if ( P_IsSprinting( pl ) or is_wallrunning ) and len2d > 44100 then
+
+        if (P_IsSprinting(pl) or is_wallrunning) and len2d > 44100 then
             local iIdeal, iSeq = ACT_MP_RUN, -1
             if not nosprint then
-                iSeq = E_LookupSequence( pl, sequence )
+                iSeq = E_LookupSequence(pl, sequence)
             end
-            
+
             return iIdeal, iSeq
         end
-        
+
         if IsValid(wep) and wep.CalcMainActivity then
             local iIdeal, iSeq = wep:CalcMainActivity(vel)
             if iIdeal and iSeq then
