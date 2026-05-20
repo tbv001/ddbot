@@ -848,10 +848,10 @@ function DDBot.StartCommand(bot, cmd)
     local isThug = bot:IsThug()
     local wantsToCharge = cv_ThugChargeEnabled and isThug and controller.ChargeAttackTime > curTime
     local isCurrentlyCharging = isThug and botWeaponValid and
-    ((botWeapon.IsCharging and botWeapon:IsCharging()) or (botWeapon.IsChargeAttacking and botWeapon:IsChargeAttacking()))
+        ((botWeapon.IsCharging and botWeapon:IsCharging()) or (botWeapon.IsChargeAttacking and botWeapon:IsChargeAttacking()))
     local isChargingCheck = isThug and controller.ChargeAttackTime < curTime + 4
     local aboutToThrowNade = cv_CanUseGrenadesEnabled and bot.Skills.agility == 15 and isTargetVisible and
-    controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
+        controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
     local curSpell = bot.GetCurrentSpell and bot:GetCurrentSpell()
     local isAlreadyAttacking = false
     local isAlreadyCasting = false
@@ -962,7 +962,7 @@ function DDBot.StartCommand(bot, cmd)
 
                 local targetDist = botPos:DistToSqr(target:GetPos())
                 local attack2 = (wantsToCharge or (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime)) and
-                IN_ATTACK2 or 0
+                    IN_ATTACK2 or 0
                 local inMeleeRange = not melee or wantsToCharge or targetDist < 10000
                 if inMeleeRange then
                     local attackButton = IN_ATTACK
@@ -1151,7 +1151,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     if isKothMode then
         if objective and IsValid(objective) then
             objective.radius2d = objective.radius2d or
-            ((objective:GetRadius() - 12) * (objective:GetRadius() - 12) / 1.5)
+                ((objective:GetRadius() - 12) * (objective:GetRadius() - 12) / 1.5)
             objectivePos = objective:GetPos()
         end
 
@@ -1254,7 +1254,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         local targetPos = visibleTargetPos and controller.Target:GetPos() or
-        (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:GetPos()
+            (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:GetPos()
         local distance = targetPos:DistToSqr(botPos)
 
         if visibleTargetPos then
@@ -1441,7 +1441,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         local aimAtPos = visibleTargetPos or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or
-        controller.Target:WorldSpaceCenter()
+            controller.Target:WorldSpaceCenter()
 
         local wepValid = IsValid(wep)
         if wepValid and cv_AimPredictionEnabled then
@@ -1571,11 +1571,28 @@ local targetsCoroutine = nil
 local propsCoroutine = nil
 local queueCoroutine = nil
 local quotaCoroutine = nil
+local playersCoroutine = nil
+local playersGrid = DDBot.SpatialGrid.Create(1500)
 
 local function shouldYield()
     curProcessing = curProcessing + 1
     if curProcessing >= cv_ProcessingLimitVal then
         curProcessing = 0
+        coroutine.yield()
+    end
+end
+
+function DDBot.UpdatePlayers()
+    while true do
+        playersGrid:Clear()
+        for _, ply in player.Iterator() do
+            if ply:Alive() then
+                playersGrid:Insert(ply, ply:GetPos())
+            end
+
+            shouldYield()
+        end
+
         coroutine.yield()
     end
 end
@@ -1606,17 +1623,7 @@ function DDBot.UpdateGeneral()
 end
 
 function DDBot.UpdateTargets()
-    local targetsGrid = DDBot.SpatialGrid.Create(1500)
-
     while true do
-        targetsGrid:Clear()
-        for _, ply in player.Iterator() do
-            if ply:Alive() then
-                targetsGrid:Insert(ply, ply:GetPos())
-            end
-            shouldYield()
-        end
-
         for _, bot in player.Iterator() do
             if not bot:IsBot() or not bot:Alive() then continue end
 
@@ -1630,7 +1637,7 @@ function DDBot.UpdateTargets()
             pooledTargets = {}
             pooledTargetDistances = {}
 
-            local candidates, candidateCount = targetsGrid:GetInRadius(botPos, 1500, function(ply)
+            local candidates, candidateCount = playersGrid:GetInRadius(botPos, 1500, function(ply)
                 if ply == bot or not ply:Alive() then return false end
                 return not isTeamPlay or ply:Team() ~= botTeam
             end)
@@ -1647,7 +1654,8 @@ function DDBot.UpdateTargets()
                 table.sort(pooledTargets, DDBot.SortTargets)
             end
 
-            local currentTargetDistSqr = IsValid(controller.Target) and botPos:DistToSqr(controller.Target:GetPos()) or math.huge
+            local currentTargetDistSqr = IsValid(controller.Target) and botPos:DistToSqr(controller.Target:GetPos()) or
+            math.huge
             for i = 1, pooledTargetCount do
                 local ply = pooledTargets[i]
                 local isTargetVisible = DDBot.IsTargetVisible(bot, ply, controller.TraceFilter)
@@ -1762,13 +1770,13 @@ function DDBot.ProcessSupportQueue()
             local targetPos = target:GetPos()
             local targetCenter = target:WorldSpaceCenter()
 
-            local bots = player.GetBots()
-            local numBots = #bots
+            local candidates, numCandidates = playersGrid:GetInRadius(plyPos, 1500, function(ent)
+                if not ent:IsBot() or ent == ply or not IsValid(ent) then return false end
+                return true
+            end)
 
-            for j = 1, numBots do
-                local bot = bots[j]
-                if bot == ply or not IsValid(bot) then continue end
-
+            for j = 1, numCandidates do
+                local bot = candidates[j]
                 local controller = bot.ControllerBot
                 if not IsValid(controller) then continue end
                 if IsValid(controller.Target) then continue end
@@ -1889,6 +1897,15 @@ hook.Add("Think", "DDBot_Think", function()
         status = "suspended"
     elseif status == "suspended" then
         coroutine.resume(generalCoroutine)
+    end
+
+    -- Players Coroutine
+    status = playersCoroutine and coroutine.status(playersCoroutine)
+    if not status or status == "dead" then
+        playersCoroutine = coroutine.create(DDBot.UpdatePlayers)
+        status = "suspended"
+    elseif status == "suspended" then
+        coroutine.resume(playersCoroutine)
     end
 
     -- Targets Coroutine
