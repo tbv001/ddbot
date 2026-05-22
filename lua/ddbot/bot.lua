@@ -918,25 +918,30 @@ function DDBot.StartCommand(bot, cmd)
                 else
                     controller.LookAt:Set(botPos)
                 end
-                controller.LookAtTime = curTime + 0.1
-                controller.NextAttack2 = curTime + 0.1
-                controller.NextAttack2Delay = curTime + nextAttack2Delay
-                controller.ForcedLookAt = true
-                controller.ForceCast = true
-            elseif spellClass == "spell_cyclonetrap" then
-                controller.LookAt:Set(botPos)
-                controller.LookAtTime = curTime + 0.1
-                controller.NextAttack2 = curTime + 0.1
-                controller.NextAttack2Delay = curTime + nextAttack2Delay
-                controller.ForcedLookAt = true
-                controller.ForceCast = true
             elseif spellClass == "spell_bloodtrap" then
                 controller.LookAt:Set(botPos)
                 controller.LookAt.z = controller.LookAt.z + 1000
+            elseif spellClass == "spell_cyclonetrap" then
+                controller.LookAt:Set(botPos)
+                controller.LookAt.z = controller.LookAt.z - 1000
+            end
+
+            if spellClass == "spell_cure" or spellClass == "spell_cyclonetrap" or spellClass == "spell_bloodtrap" then
                 controller.LookAtTime = curTime + 0.1
                 controller.NextAttack2 = curTime + 0.1
                 controller.NextAttack2Delay = curTime + nextAttack2Delay
                 controller.ForcedLookAt = true
+
+                local aimVec = bot:GetAimVector()
+                tempVector:Set(controller.LookAt)
+                tempVector:Sub(bot:GetShootPos())
+                tempVector:Normalize()
+                if aimVec:Dot(tempVector) < 0.9 then
+                    controller.LookAtTime = curTime + 0.1
+                    controller.ForceCast = false
+                    return
+                end
+
                 controller.ForceCast = true
             end
         end
@@ -1655,7 +1660,7 @@ function DDBot.UpdateTargets()
             end
 
             local currentTargetDistSqr = IsValid(controller.Target) and botPos:DistToSqr(controller.Target:GetPos()) or
-            math.huge
+                math.huge
             for i = 1, pooledTargetCount do
                 local ply = pooledTargets[i]
                 local isTargetVisible = DDBot.IsTargetVisible(bot, ply, controller.TraceFilter)
@@ -1770,7 +1775,7 @@ function DDBot.ProcessSupportQueue()
             local targetPos = target:GetPos()
             local targetCenter = target:WorldSpaceCenter()
 
-            local candidates, numCandidates = playersGrid:GetInRadius(plyPos, 1500, function(ent)
+            local candidates, numCandidates = playersGrid:GetInRadius(plyPos, 500, function(ent)
                 if not ent:IsBot() or ent == ply or not IsValid(ent) then return false end
                 return true
             end)
@@ -1784,7 +1789,7 @@ function DDBot.ProcessSupportQueue()
                 if plyTeam and bot.Team and bot:Team() ~= plyTeam then continue end
 
                 local isVisible = bot:VisibleVec(ply:EyePos())
-                if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then continue end
+                if not isVisible then continue end
 
                 if canSetPos then
                     controller.PosGen:Set(targetPos)
